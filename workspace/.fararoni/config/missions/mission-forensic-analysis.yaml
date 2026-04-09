@@ -1,0 +1,277 @@
+# Copyright (c) 2026 Eber Cruz Fararoni — MIT License
+# See LICENSE file in the project root.
+#
+# ---
+#
+# Este programa es software libre: puedes redistribuirlo y/o modificarlo
+# bajo los términos de la Licencia Pública General Affero de GNU tal como
+# fue publicada por la Free Software Foundation, en la versión 3 de la Licencia.
+#
+# Este programa se distribuye con la esperanza de que sea útil, pero
+# SIN NINGUNA GARANTÍA; ni siquiera la garantía implícita de COMERCIABILIDAD
+# o IDONEIDAD PARA UN PROPÓSITO PARTICULAR. Consulta la Licencia Pública
+# General Affero de GNU para obtener más detalles.
+#
+# Deberías haber recibido una copia de la Licencia Pública General Affero de GNU
+# junto con este programa. Si no es así, consulta <https://www.gnu.org/licenses/>.
+
+# ═══════════════════════════════════════════════════════════════════════════
+# MISSION: FORENSIC ANALYSIS - Análisis forense de bugs
+# HU-002 - Agente FORENSE
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# Uso: Debugging profundo, root cause analysis, fix verificable
+# Agentes: COMMANDER → FORENSE → SENTINEL → BUILDER → NOTARY
+# Flujo: recibir síntoma → análisis forense → review fix → aplicar fix → certificar
+#
+# ═══════════════════════════════════════════════════════════════════════════
+
+missionId: forensic-analysis
+name: "Análisis Forense de Bugs"
+description: "Análisis forense multi-paso: triage, hipótesis, investigación paralela, root cause, fix verificable"
+maxIterations: 8
+
+initialStepId: receive_symptom
+
+steps:
+  # ─────────────────────────────────────────────────────────────────────────
+  # PASO 1: Commander recibe y valida el síntoma
+  # ─────────────────────────────────────────────────────────────────────────
+  receive_symptom:
+    requiredCapability: coordination
+    systemPromptOverride: |
+      Recibiste un reporte de bug o síntoma de error.
+
+      Tu tarea:
+      1. Extraer el síntoma principal (error, log, stack trace, comportamiento)
+      2. Identificar archivos/componentes mencionados
+      3. Determinar urgencia (CRITICAL si afecta producción, HIGH si bloquea desarrollo)
+      4. Formatear como ForensicRequest para el agente FORENSE
+
+      FORMATO DE SALIDA:
+      SÍNTOMA: <descripción clara del error>
+      ARCHIVOS RELEVANTES: <lista de archivos mencionados>
+      CONTEXTO: <qué estaba haciendo el sistema>
+      URGENCIA: CRITICAL | HIGH | MEDIUM | LOW
+    transitions:
+      success: forensic_analysis
+      failure: end_failure
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # PASO 2: FORENSE ejecuta análisis completo
+  # ─────────────────────────────────────────────────────────────────────────
+  forensic_analysis:
+    requiredCapability: forensic_analysis
+    systemPromptOverride: |
+      Ejecuta el PROTOCOLO DE ANÁLISIS FORENSE completo:
+
+      1. TRIAGE: Clasifica el síntoma (NULL_POINTER, FLOW_BREAK, LOGIC_ERROR, etc.)
+      2. MEMORIA: Busca casos similares con vector_search (similarity >= 0.70)
+      3. HIPÓTESIS: Formula 1-3 hipótesis con plan de búsqueda
+      4. INVESTIGACIÓN: Ejecuta tools para cada hipótesis
+         - ast_query para flujo de datos
+         - symbol_lookup para beans/métodos
+         - grep_semantic para invocaciones scope-aware
+      5. ROOT CAUSE: Identifica causa raíz con archivo:línea y evidencia
+      6. FIX: Propón fix verificable (validado contra AST si disponible)
+
+      FORMATO DE SALIDA:
+      [TRIAGE] Tipo: <tipo> | Severidad: <severidad>
+      [MEMORIA] <caso similar encontrado o "sin match previo">
+      [HIPÓTESIS] H1: <descripción> (confianza: <0.0-1.0>)
+      [EVIDENCIA] <archivo:línea> — <hallazgo>
+      [ROOT CAUSE] <archivo:línea> — <explicación>
+      [FIX] <archivo:línea>
+        ANTES: <código actual>
+        DESPUÉS: <código propuesto>
+        RAZÓN: <por qué funciona>
+
+      REGLAS:
+      - NUNCA propongas fix sin root cause identificado
+      - Si INCONCLUSIVE: reporta evidencia parcial y sugiere siguiente paso
+      - Guarda el caso en memoria al terminar
+    transitions:
+      success: review_fix
+      failure: escalate_inconclusive
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # PASO 2.1: Escalamiento si FORENSE no encuentra root cause
+  # ─────────────────────────────────────────────────────────────────────────
+  escalate_inconclusive:
+    requiredCapability: coordination
+    systemPromptOverride: |
+      ⚠️ El análisis forense fue INCONCLUSIVE.
+
+      Evidencia parcial disponible:
+      %s
+
+      Opciones:
+      1. Pedir más contexto al usuario (logs adicionales, pasos para reproducir)
+      2. Ampliar scope de búsqueda (más archivos, más hipótesis)
+      3. Marcar como necesita investigación manual
+
+      Genera un reporte claro de lo que se investigó y lo que falta.
+    transitions:
+      success: end_failure
+      failure: end_failure
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # PASO 3: Sentinel revisa el fix propuesto
+  # ─────────────────────────────────────────────────────────────────────────
+  review_fix:
+    requiredCapability: code_review
+    maxRetries: 3
+    systemPromptOverride: |
+      Revisa el fix propuesto por el agente FORENSE.
+
+      Evalúa:
+      1. ¿El root cause identificado es correcto? (revisa la evidencia)
+      2. ¿El fix resuelve el root cause sin introducir nuevos bugs?
+      3. ¿El fix es minimal? (no cambia más de lo necesario)
+      4. ¿Hay efectos secundarios no contemplados?
+
+      Veredicto: APROBAR o RECHAZAR con justificación.
+      Si RECHAZAR: explica qué falta o qué está mal en el análisis.
+    transitions:
+      success: apply_fix
+      failure: refine_analysis
+      fallback: force_apply
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # PASO 3.1: FORENSE refina análisis tras rechazo de Sentinel
+  # ─────────────────────────────────────────────────────────────────────────
+  refine_analysis:
+    requiredCapability: forensic_analysis
+    systemPromptOverride: |
+      El Sentinel RECHAZÓ tu fix. Feedback:
+      %s
+
+      Refina tu análisis:
+      1. Revisa las objeciones del Sentinel
+      2. Investiga hipótesis alternativas si el root cause era incorrecto
+      3. Ajusta el fix si la objeción es sobre el cambio propuesto
+      4. Propón fix revisado con nueva evidencia
+
+      Usa el mismo formato de salida del análisis forense.
+    transitions:
+      success: review_fix
+      failure: escalate_inconclusive
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # PASO 3.2: Aplicación forzada (fallback anti-loop)
+  # ─────────────────────────────────────────────────────────────────────────
+  force_apply:
+    requiredCapability: code_review
+    systemPromptOverride: |
+      ⚠️ APLICACIÓN FORZADA POR EXCESO DE ITERACIONES.
+      Aprueba el fix con advertencias sobre issues conocidos.
+      Genera reporte de riesgo residual.
+    transitions:
+      success: apply_fix
+      failure: end_failure
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # PASO 4: Builder aplica el fix aprobado
+  # ─────────────────────────────────────────────────────────────────────────
+  apply_fix:
+    requiredCapability: code_generation
+    systemPromptOverride: |
+      Aplica el fix aprobado por el Sentinel.
+
+      FIX A APLICAR:
+      %s
+
+      INSTRUCCIONES:
+      1. Lee el archivo actual
+      2. Aplica el cambio exacto (ANTES → DESPUÉS)
+      3. Genera el archivo completo con el fix usando formato >>>FILE:
+      4. NO hagas cambios adicionales fuera del fix aprobado
+
+      >>>FILE: <ruta_del_archivo>
+      <contenido completo con el fix aplicado>
+    transitions:
+      success: verify_fix
+      failure: rollback_fix
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # PASO 5: Verificación del fix (compilación/tests)
+  # ─────────────────────────────────────────────────────────────────────────
+  verify_fix:
+    requiredCapability: deployment_verification
+    systemPromptOverride: |
+      Verifica que el fix aplicado funciona:
+      1. Compilación exitosa (mvn compile)
+      2. Tests pasan (mvn test si aplica)
+      3. El síntoma original ya no se reproduce
+
+      Reporta: VERIFICADO o FALLO con detalles.
+    transitions:
+      success: certify_fix
+      failure: rollback_fix
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # PASO 6: Notary certifica el fix
+  # ─────────────────────────────────────────────────────────────────────────
+  certify_fix:
+    requiredCapability: audit_logging
+    systemPromptOverride: |
+      REGISTRO DE ANÁLISIS FORENSE COMPLETADO:
+
+      Formato: [FORENSIC-AUDIT] <Timestamp> | <CorrelationId> | CASE_RESOLVED
+      Documenta:
+      - Síntoma original
+      - Root cause identificado (archivo:línea)
+      - Fix aplicado
+      - Verificación: compilación + tests
+      - Confianza del análisis
+      - Caso guardado en memoria forense: SI/NO
+
+      Hash de integridad del fix aplicado.
+    transitions:
+      success: end_success
+      failure: end_success  # Auditoría falla silenciosamente
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # COMPENSACIÓN: Rollback del fix
+  # ─────────────────────────────────────────────────────────────────────────
+  rollback_fix:
+    requiredCapability: code_generation
+    compensationStep: true
+    systemPromptOverride: |
+      COMPENSACIÓN SAGA: El fix falló verificación.
+      Revierte los cambios al estado anterior.
+      Reporta archivos restaurados.
+    transitions:
+      success: end_rollback
+      failure: end_failure
+
+# ═══════════════════════════════════════════════════════════════════════════
+# CONFIGURACIÓN DEFCON
+# ═══════════════════════════════════════════════════════════════════════════
+defconLevel: 3
+agentsRequired:
+  - commander
+  - forense
+  - sentinel
+  - builder
+
+agentsOptional:
+  - operator   # Verificación de despliegue
+  - notary     # Auditoría/certificación
+
+# ═══════════════════════════════════════════════════════════════════════════
+# TIMEOUT Y REINTENTOS
+# ═══════════════════════════════════════════════════════════════════════════
+timeoutPerStep: 90000  # 90 segundos (análisis forense es más largo)
+maxRetries: 3
+maxSentinelIterations: 3
+
+# ═══════════════════════════════════════════════════════════════════════════
+# NOTAS DE DISEÑO
+# ═══════════════════════════════════════════════════════════════════════════
+# - FORENSE es el agente central de esta misión (no Blueprint/Builder)
+# - El flujo de loop es: forensic_analysis → review_fix → refine_analysis → review_fix
+# - Máximo 3 iteraciones de refinamiento antes de force_apply
+# - escalate_inconclusive es salida digna si no se encuentra root cause
+# - rollback_fix revierte cambios si el fix rompe compilación/tests
+# ═══════════════════════════════════════════════════════════════════════════

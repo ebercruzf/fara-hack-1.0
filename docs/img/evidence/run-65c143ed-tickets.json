@@ -1,0 +1,15 @@
+{
+    "count": 1,
+    "tickets": [
+        {
+            "ticketId": "FH-1",
+            "title": "PRODUCTION OUTAGE \u2014 checkout failing with 500 errors",
+            "state": "OPEN",
+            "severity": "P0",
+            "assignedTo": "",
+            "sentinelVerified": false,
+            "createdAt": "2026-04-09T03:58:27.175048513Z",
+            "ticketUrl": "local://ticket/65c143ed-e06f-4021-b4e9-6503a51d878e"
+        }
+    ]
+}

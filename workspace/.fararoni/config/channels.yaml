@@ -1,0 +1,70 @@
+# ═══════════════════════════════════════════════════════════════════
+# CONFIGURACION DE CANALES - FARARONI FASE 45
+# ═══════════════════════════════════════════════════════════════════
+#
+# Este archivo define los canales de comunicacion externos
+# (WhatsApp, Matrix, Telegram).
+#
+# Ubicacion: ~/.fararoni/config/channels.yaml
+#
+# IMPORTANTE: No compartas este archivo - contiene tokens sensibles.
+# ═══════════════════════════════════════════════════════════════════
+
+channels:
+  # ─────────────────────────────────────────────────────────────────
+  # WHATSAPP - Canal "The Diplomat" (UNTRUSTED_EXTERNAL)
+  # Requiere libreria Cobalt o whatsapp-web.js bridge
+  # ─────────────────────────────────────────────────────────────────
+  whatsapp:
+    enabled: false
+
+    # Ruta donde se guarda la sesion de WhatsApp Web
+    session_path: "~/.fararoni/data/whatsapp-session"
+
+    # Limite de mensajes por segundo (evitar ban)
+    rate_limit_per_second: 10
+
+    # Tiempo de espera antes de reconectar (ms)
+    reconnect_delay_ms: 5000
+
+    # Intentos maximos de reconexion
+    max_reconnect_attempts: 5
+
+  # ─────────────────────────────────────────────────────────────────
+  # MATRIX - Canal "The Bunker" (SECURE_ENCRYPTED)
+  # Servidor Synapse autoalojado con E2EE
+  # ─────────────────────────────────────────────────────────────────
+  matrix:
+    enabled: false
+
+    # URL del servidor Synapse
+    homeserver: "https://matrix.example.com"
+
+    # Token de acceso del bot
+    # Obtener con: curl -X POST -d '{"type":"m.login.password","user":"bot","password":"xxx"}' https://matrix.example.com/_matrix/client/r0/login
+    access_token: "syt_xxx..."
+
+    # ID del usuario bot
+    user_id: "@fararoni:example.com"
+
+    # Room ID para comandos (crear room privado)
+    room_id: "!abc123:example.com"
+
+    # Timeout del long-polling sync (ms)
+    sync_timeout_ms: 30000
+
+  # ─────────────────────────────────────────────────────────────────
+  # TELEGRAM - Canal "The Mercenary" (UNTRUSTED_EXTERNAL)
+  # Bot API oficial
+  # ─────────────────────────────────────────────────────────────────
+  telegram:
+    enabled: false
+
+    # Token del bot (obtener de @BotFather)
+    bot_token: "123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
+
+    # Username del bot (sin @)
+    bot_username: "fararoni_bot"
+
+    # Timeout del long-polling (segundos)
+    polling_timeout_sec: 30

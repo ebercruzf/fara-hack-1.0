@@ -1,0 +1,41 @@
+# .dockerignore for fara-hack-1.0 backend Dockerfile
+#
+# IMPORTANT: We DO want to send target/fara-hack-1.0.jar to the
+# build context — the new Dockerfile is single-stage and copies the
+# pre-built fat jar from there. Do NOT exclude target/ wholesale.
+#
+# We exclude everything else that would just inflate the build
+# context for no reason.
+
+**/.git/
+**/.idea/
+**/*.iml
+**/node_modules/
+**/.DS_Store
+**/.vscode/
+
+# Frontend build artifacts and source — the web/ directory has its
+# own Dockerfile and .dockerignore. Exclude from backend context.
+web/
+
+# Logs and temp
+*.log
+log/
+backups/
+tmp/
+
+# Don't ship the .env file (contains secrets)
+.env
+
+# Documentation — not needed inside the container
+docs/
+
+# Maven build internals — but KEEP target/fara-hack-1.0.jar
+target/classes/
+target/test-classes/
+target/maven-status/
+target/surefire-reports/
+target/fara-hack-1.0-1.0.0-shaded.jar
+target/original-fara-hack-1.0.jar
+target/dependency-reduced-pom.xml
+target/site/

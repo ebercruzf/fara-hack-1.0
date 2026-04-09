@@ -1,0 +1,6 @@
+Copyright (c) 2026 Eber Cruz Fararoni
+
+ This file is part of the core infrastructure.
+ This source code is licensed under the MIT License found in the
+ LICENSE file in the root directory of this source tree.
+ Any distribution or modification must retain this copyright notice.

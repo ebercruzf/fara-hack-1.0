@@ -1,0 +1,621 @@
+# Copyright (C) 2026 Eber Cruz Fararoni
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, version 3 of the License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# ---
+#
+# Este programa es software libre: puedes redistribuirlo y/o modificarlo
+# bajo los términos de la Licencia Pública General Affero de GNU tal como
+# fue publicada por la Free Software Foundation, en la versión 3 de la Licencia.
+#
+# Este programa se distribuye con la esperanza de que sea útil, pero
+# SIN NINGUNA GARANTÍA; ni siquiera la garantía implícita de COMERCIABILIDAD
+# o IDONEIDAD PARA UN PROPÓSITO PARTICULAR. Consulta la Licencia Pública
+# General Affero de GNU para obtener más detalles.
+#
+# Deberías haber recibido una copia de la Licencia Pública General Affero de GNU
+# junto con este programa. Si no es así, consulta <https://www.gnu.org/licenses/>.
+
+# =============================================================================
+#                     FARARONI MODULES CONFIGURATION
+# =============================================================================
+#
+# Archivo de configuracion principal para modulos del Gateway OmniChannel.
+# Ubicacion: ~/.fararoni/config/modules.yml
+#
+# FASES IMPLEMENTADAS:
+#   - FASE 71   : OmniChannel Gateway REST Module
+#   - FASE 71.2 : WhatsApp Enterprise (Meta Business API)
+#   - FASE 71.3 : Contexto por Sesion (Multi-tenant)
+#   - FASE 71.4 : Identity Check + Filtro de Grupos
+#   - FASE 71.5 : Telegram Sidecar (Telegraf)
+#   - FASE 71.6 : Discord Sidecar (Discord.js)
+#   - FASE 71.7 : iMessage Sidecar (BlueBubbles)
+#
+# DOCUMENTACION:
+#   - BIBLIA: docs/arquitectura/BIBLIA-ARQUITECTURA-OMNICHANNEL-GRADO-MILITAR.md
+#   - Manual WhatsApp: docs/manuales/MANUAL-WHATSAPP-ENTERPRISE.md
+#   - Registro: docs/arquitectura/FASE-71-REGISTRO-CAMBIOS.md
+#
+# SINTAXIS DE VARIABLES DE ENTORNO:
+#   - Usar "env:NOMBRE_VARIABLE" para leer valores del entorno
+#   - Ejemplo: api_token: "env:FARARONI_GATEWAY_TOKEN"
+#
+# =============================================================================
+
+
+# =============================================================================
+# SECCION 1: GATEWAY REST
+# =============================================================================
+# El Gateway REST es el punto de entrada HTTP para todos los Sidecars externos.
+# Recibe mensajes de WhatsApp, Telegram, etc. y los inyecta al bus interno.
+#
+# ARQUITECTURA:
+#   Sidecar (Node.js) --> POST /gateway/v1/inbound --> RestIngressServer
+#                                                          |
+#                                                          v
+#                                                   SovereignEventBus
+# =============================================================================
+
+gateway:
+
+  # ---------------------------------------------------------------------------
+  # 1.1 REST SERVER - Servidor HTTP principal del Gateway
+  # ---------------------------------------------------------------------------
+  # Puerto: 7071 (separado del CLI que usa 7070)
+  # Endpoints:
+  #   - POST /gateway/v1/inbound  : Recibe mensajes de Sidecars
+  #   - GET  /gateway/v1/health   : Health check
+  #   - GET  /gateway/v1/meta/webhook : Verificacion Meta (FASE 71.2)
+  #   - POST /gateway/v1/meta/webhook : Mensajes de Meta (FASE 71.2)
+  # ---------------------------------------------------------------------------
+  rest:
+    # enabled: Activa o desactiva el servidor REST del Gateway
+    # Valores: true | false
+    # Default: true
+    enabled: true
+
+    # port: Puerto TCP donde escucha el servidor HTTP
+    # Rango valido: 1024-65535
+    # Default: 7071
+    # IMPORTANTE: No usar 7070 (conflicto con CLI Server)
+    port: 7071
+
+    # -------------------------------------------------------------------------
+    # 1.1.1 SECURITY - Autenticacion de Sidecars
+    # -------------------------------------------------------------------------
+    # Configura la autenticacion que deben usar los Sidecars para conectarse.
+    # En produccion, SIEMPRE habilitar api_token para evitar acceso no autorizado.
+    # -------------------------------------------------------------------------
+    security:
+      # api_token: Token Bearer que deben enviar los Sidecars
+      # Formato header: "Authorization: Bearer <token>"
+      # Usar "env:VARIABLE" para leer de variable de entorno
+      # Dejar comentado para modo desarrollo (sin autenticacion)
+      #
+      # Ejemplo de uso:
+      #   1. export FARARONI_GATEWAY_TOKEN="mi_token_secreto"
+      #   2. Descomentar la linea siguiente
+      #
+      # api_token: "env:FARARONI_GATEWAY_TOKEN"
+
+      # -----------------------------------------------------------------------
+      # FASE 71.8: Admin Token para endpoints de Control Plane
+      # -----------------------------------------------------------------------
+      # Token requerido para acceder a endpoints administrativos:
+      #   - POST /gateway/v1/admin/channels/reload
+      #   - GET  /gateway/v1/admin/channels/status
+      #
+      # Formato header: "X-Fararoni-Admin-Token: <token>"
+      # Dejar comentado para modo desarrollo (sin autenticacion)
+      #
+      # Ejemplo de uso:
+      #   1. export FARARONI_ADMIN_TOKEN="mi_admin_token"
+      #   2. Descomentar la linea siguiente
+      #
+      # admin_token: "env:FARARONI_ADMIN_TOKEN"
+
+    # -------------------------------------------------------------------------
+    # 1.1.2 LIMITS - Proteccion contra abusos
+    # -------------------------------------------------------------------------
+    # Configura limites para proteger el servidor de sobrecarga.
+    # Usa el algoritmo Token Bucket para rate limiting.
+    # -------------------------------------------------------------------------
+    limits:
+      # max_payload_mb: Tamano maximo del cuerpo de la peticion en MB
+      # Util para limitar archivos multimedia grandes
+      # Default: 20
+      max_payload_mb: 20
+
+      # rate_limit_capacity: Numero maximo de peticiones en rafaga
+      # Si se excede, el servidor responde HTTP 429 (Too Many Requests)
+      # Default: 100
+      rate_limit_capacity: 100
+
+      # rate_limit_refill: Tokens regenerados por segundo
+      # Controla la velocidad sostenida de peticiones permitidas
+      # Default: 10
+      rate_limit_refill: 10
+
+  # ---------------------------------------------------------------------------
+  # 1.2 META ENTERPRISE - WhatsApp Business API (FASE 71.2)
+  # ---------------------------------------------------------------------------
+  # Configuracion para conectar directamente con la API oficial de Meta.
+  # Alternativa al Sidecar de Baileys para clientes corporativos.
+  #
+  # REQUISITOS:
+  #   - Cuenta verificada en Meta for Developers
+  #   - WhatsApp Business Account aprobado
+  #   - Numero de telefono dedicado registrado
+  #   - Servidor con HTTPS (Meta no acepta HTTP)
+  #
+  # DOCUMENTACION: docs/manuales/MANUAL-WHATSAPP-ENTERPRISE.md
+  # ---------------------------------------------------------------------------
+  meta:
+    # enabled: Activa el endpoint de webhook para Meta
+    # Valores: true | false
+    # Default: false (requiere cuenta Meta Business verificada)
+    enabled: false
+
+    # verify_token: Token secreto para verificacion del webhook
+    # Meta envia este token en peticiones GET para validar propiedad
+    # DEBE coincidir con el configurado en Meta for Developers
+    # Usar "env:META_VERIFY_TOKEN" para seguridad
+    verify_token: "env:META_VERIFY_TOKEN"
+
+    # access_token: Token de acceso a la Graph API de Meta
+    # Obtener de Meta for Developers -> System User Token
+    # NUNCA hardcodear en este archivo - usar variable de entorno
+    access_token: "env:META_ACCESS_TOKEN"
+
+    # phone_id: Phone Number ID de Meta Business
+    # Identificador del numero de WhatsApp Business (no el numero telefono)
+    # Encontrar en: Meta for Developers -> WhatsApp -> Phone Numbers
+    phone_id: "env:META_PHONE_ID"
+
+    # api_version: Version de la Graph API a usar
+    # Formato: "vXX.0" (ej: v18.0, v19.0)
+    # Verificar compatibilidad en: developers.facebook.com/docs/graph-api
+    api_version: "v18.0"
+
+
+# =============================================================================
+# SECCION 2: CHANNELS (Canales de Mensajeria)
+# =============================================================================
+# Define los canales de comunicacion disponibles.
+# Cada canal representa un Sidecar externo (Node.js, Python, etc.) que
+# traduce un protocolo especifico al formato UniversalMessage.
+#
+# ARQUITECTURA:
+#   Usuario -> [WhatsApp/Telegram/etc] -> Sidecar -> Gateway -> FararoniCore
+#                                                       |
+#   Usuario <- [WhatsApp/Telegram/etc] <- Sidecar <- ---+
+#
+# CAMPOS COMUNES:
+#   - enabled     : Activa/desactiva el canal
+#   - trust_level : Nivel de confianza del origen
+#   - egress_url  : URL donde enviar respuestas
+#   - capabilities: Tipos de contenido soportados
+#   - timeout_ms  : Timeout para peticiones HTTP
+#   - retry_count : Intentos de reenvio en caso de fallo
+# =============================================================================
+
+channels:
+
+  # ---------------------------------------------------------------------------
+  # 2.1 WHATSAPP (Baileys Sidecar) - FASE 71
+  # ---------------------------------------------------------------------------
+  # Canal para WhatsApp personal usando Baileys (libreria no oficial).
+  # Requiere un Sidecar Node.js corriendo en puerto 3000.
+  #
+  # SIDECAR: fararoni-sidecar-wa/
+  # PUERTO: 3000
+  # LIBRERIA: @whiskeysockets/baileys
+  #
+  # LIMITACIONES:
+  #   - Requiere escanear QR con tu telefono
+  #   - Riesgo de ban si Meta detecta automatizacion
+  #   - Sin soporte oficial
+  #
+  # PARA PRODUCCION: Usar whatsapp_meta (FASE 71.2)
+  # ---------------------------------------------------------------------------
+  whatsapp:
+    # enabled: Activa el canal de WhatsApp via Baileys
+    # Valores: true | false
+    # Requiere: Sidecar corriendo en puerto 3000
+    enabled: true
+
+    # trust_level: Nivel de confianza del origen
+    # Valores:
+    #   - SECURE_INTERNAL   : Origen interno (CLI, tests)
+    #   - SECURE_ENTERPRISE : API oficial verificada (Meta Enterprise)
+    #   - SECURE_ENCRYPTED  : Canal cifrado (Telegram)
+    #   - UNTRUSTED_EXTERNAL: Origen externo no verificado (Baileys)
+    trust_level: UNTRUSTED_EXTERNAL
+
+    # egress_url: URL del Sidecar para enviar respuestas
+    # Formato: http://host:puerto/ruta
+    # El Sidecar debe exponer POST /send
+    egress_url: "http://localhost:3000/send"
+
+    # capabilities: Tipos de contenido que el canal soporta
+    # Valores posibles: text, audio, image, video, document, location
+    capabilities:
+      - text
+      - audio
+      - image
+
+    # timeout_ms: Timeout en milisegundos para peticiones al Sidecar
+    # Si el Sidecar no responde en este tiempo, se considera error
+    # Default: 5000 (5 segundos)
+    timeout_ms: 5000
+
+    # retry_count: Intentos de reenvio si falla la primera peticion
+    # 0 = sin reintentos, 3 = hasta 3 reintentos
+    # Default: 3
+    retry_count: 3
+
+  # ---------------------------------------------------------------------------
+  # 2.2 WHATSAPP META (Enterprise API) - FASE 71.2
+  # ---------------------------------------------------------------------------
+  # Canal para WhatsApp Business usando la API oficial de Meta.
+  # NO requiere Sidecar - comunicacion directa Java -> Graph API.
+  #
+  # VENTAJAS:
+  #   - API oficial con SLA 99.9%
+  #   - Sin riesgo de ban
+  #   - Soporte para templates masivos
+  #   - Soporte tecnico de Meta
+  #
+  # REQUISITOS:
+  #   - Cuenta Meta Business verificada
+  #   - Configurar seccion gateway.meta
+  #
+  # COSTO: ~$0.005-0.08 USD por mensaje
+  # ---------------------------------------------------------------------------
+  whatsapp_meta:
+    # enabled: Activa el canal de WhatsApp Enterprise
+    # Valores: true | false
+    # Requiere: gateway.meta configurado y enabled: true
+    enabled: false
+
+    # trust_level: Nivel de confianza (Enterprise = maximo)
+    trust_level: SECURE_ENTERPRISE
+
+    # egress_adapter: Nombre del adaptador de egress a usar
+    # "meta_enterprise" usa MetaEnterpriseEgressAdapter.java
+    # que envia directamente a Graph API en lugar de HTTP a Sidecar
+    egress_adapter: "meta_enterprise"
+
+    # capabilities: Tipos de contenido soportados
+    # "template" = mensajes de plantilla pre-aprobados por Meta
+    capabilities:
+      - text
+      - template
+
+    # timeout_ms: Timeout para llamadas a Graph API (mas alto por latencia)
+    timeout_ms: 10000
+
+    # retry_count: Reintentos para Graph API
+    retry_count: 3
+
+  # ---------------------------------------------------------------------------
+  # 2.3 TELEGRAM (Telegraf Sidecar) - FASE 71.5
+  # ---------------------------------------------------------------------------
+  # Canal para Telegram usando un bot creado en @BotFather.
+  # Requiere un Sidecar Node.js corriendo en puerto 3001.
+  #
+  # SIDECAR: fararoni-sidecar-tg/
+  # PUERTO: 3001
+  # LIBRERIA: telegraf
+  #
+  # VENTAJAS:
+  #   - API oficial y gratuita
+  #   - Sin riesgo de ban
+  #   - Token permanente (no expira)
+  #   - Cifrado end-to-end
+  #
+  # SEGURIDAD:
+  #   - Por defecto solo responde en chats privados (1:1)
+  #   - Mensajes de grupos son ignorados (filtro en Sidecar)
+  #
+  # CONFIGURACION:
+  #   1. Crear bot en @BotFather
+  #   2. export TELEGRAM_TOKEN="tu_token"
+  #   3. cd fararoni-sidecar-tg && npm start
+  # ---------------------------------------------------------------------------
+  telegram:
+    # enabled: Activa el canal de Telegram
+    # Valores: true | false
+    # Requiere: Sidecar corriendo en puerto 3001 con TELEGRAM_TOKEN
+    enabled: true
+
+    # trust_level: Nivel de confianza (cifrado = alto)
+    # Telegram usa cifrado end-to-end para bots
+    trust_level: SECURE_ENCRYPTED
+
+    # egress_url: URL del Sidecar para enviar respuestas
+    # El Sidecar Telegram expone POST /send
+    egress_url: "http://localhost:3001/send"
+
+    # capabilities: Tipos de contenido soportados
+    # Por ahora solo texto (multimedia en futuras versiones)
+    capabilities:
+      - text
+
+    # timeout_ms: Timeout para peticiones al Sidecar
+    timeout_ms: 5000
+
+    # retry_count: Reintentos en caso de fallo
+    retry_count: 3
+
+  # ---------------------------------------------------------------------------
+  # 2.4 DISCORD (Discord.js Sidecar) - FASE 71.6
+  # ---------------------------------------------------------------------------
+  # Canal para Discord usando un bot creado en Discord Developer Portal.
+  # Requiere un Sidecar Node.js corriendo en puerto 3002.
+  #
+  # SIDECAR: fararoni-sidecar-discord/
+  # PUERTO: 3002
+  # LIBRERIA: discord.js
+  #
+  # VENTAJAS:
+  #   - API oficial y gratuita
+  #   - Sin limites de mensajes
+  #   - Soporte para servidores y DMs
+  #   - Comunidad activa
+  #
+  # REQUISITOS:
+  #   1. Crear app en https://discord.com/developers/applications
+  #   2. Crear bot y copiar token
+  #   3. IMPORTANTE: Activar "Message Content Intent"
+  #   4. Invitar bot al servidor con OAuth2 URL Generator
+  #
+  # SEGURIDAD:
+  #   - Por defecto solo responde en DMs (mensajes directos)
+  #   - En servidores requiere mencion del bot
+  #
+  # CONFIGURACION:
+  #   1. Crear bot en Discord Developer Portal
+  #   2. export DISCORD_TOKEN="tu_token"
+  #   3. cd fararoni-sidecar-discord && npm start
+  # ---------------------------------------------------------------------------
+  discord:
+    # enabled: Activa el canal de Discord
+    # Valores: true | false
+    # Requiere: Sidecar corriendo en puerto 3002 con DISCORD_TOKEN
+    enabled: true
+
+    # trust_level: Nivel de confianza
+    # Discord usa cifrado TLS pero no end-to-end
+    trust_level: SECURE_ENCRYPTED
+
+    # egress_url: URL del Sidecar para enviar respuestas
+    # El Sidecar Discord expone POST /send
+    egress_url: "http://localhost:3002/send"
+
+    # capabilities: Tipos de contenido soportados
+    # Por ahora solo texto (multimedia en futuras versiones)
+    capabilities:
+      - text
+
+    # timeout_ms: Timeout para peticiones al Sidecar
+    timeout_ms: 5000
+
+    # retry_count: Reintentos en caso de fallo
+    retry_count: 3
+
+  # ---------------------------------------------------------------------------
+  # 2.5 IMESSAGE (BlueBubbles Sidecar) - FASE 71.7
+  # ---------------------------------------------------------------------------
+  # Canal para iMessage/SMS usando BlueBubbles como puente.
+  # Requiere un Sidecar Node.js corriendo en puerto 3003.
+  # SOLO FUNCIONA EN macOS con iMessage configurado.
+  #
+  # SIDECAR: fararoni-sidecar-imessage/
+  # PUERTO: 3003
+  # LIBRERIA: BlueBubbles Server (app nativa)
+  #
+  # VENTAJAS:
+  #   - Acceso a iMessage (burbujas azules)
+  #   - Tambien soporta SMS
+  #   - Sin riesgo de ban (usa API nativa de macOS)
+  #
+  # REQUISITOS:
+  #   1. macOS con iMessage configurado
+  #   2. BlueBubbles Server instalado (https://bluebubbles.app/)
+  #   3. Webhook configurado en BlueBubbles apuntando al Sidecar
+  #   4. export BLUEBUBBLES_PASSWORD="tu_password"
+  #   5. cd fararoni-sidecar-imessage && npm start
+  #
+  # SEGURIDAD:
+  #   - Por defecto responde a todos los mensajes entrantes
+  #   - Usar ALLOWED_SENDERS en .env para restringir remitentes
+  # ---------------------------------------------------------------------------
+  imessage:
+    # enabled: Activa el canal de iMessage
+    # Valores: true | false
+    # Requiere: Mac con BlueBubbles + Sidecar en puerto 3003
+    enabled: true
+
+    # trust_level: Nivel de confianza
+    # iMessage usa cifrado end-to-end nativo de Apple
+    trust_level: SECURE_ENCRYPTED
+
+    # egress_url: URL del Sidecar para enviar respuestas
+    # El Sidecar iMessage expone POST /send
+    egress_url: "http://localhost:3003/send"
+
+    # capabilities: Tipos de contenido soportados
+    # Por ahora solo texto (multimedia en futuras versiones)
+    capabilities:
+      - text
+
+    # timeout_ms: Timeout para peticiones al Sidecar
+    # iMessage puede ser mas lento por AppleScript
+    timeout_ms: 10000
+
+    # retry_count: Reintentos en caso de fallo
+    retry_count: 3
+
+  # ---------------------------------------------------------------------------
+  # 2.6 CLI (Canal Interno)
+  # ---------------------------------------------------------------------------
+  # Canal para la interfaz de linea de comandos local.
+  # Siempre habilitado internamente - no requiere Sidecar.
+  #
+  # USO:
+  #   java --enable-preview -jar fararoni-core.jar
+  #   (Modo interactivo en terminal)
+  # ---------------------------------------------------------------------------
+  cli:
+    # enabled: El CLI siempre esta disponible
+    enabled: true
+
+    # trust_level: Origen interno = confianza maxima
+    trust_level: SECURE_INTERNAL
+
+    # capabilities: Solo texto (terminal no soporta multimedia)
+    capabilities:
+      - text
+
+  # ---------------------------------------------------------------------------
+  # 2.7 INTELLIJ (Plugin IntelliJ IDEA) - FASE 7.8.5
+  # ---------------------------------------------------------------------------
+  # Canal para el plugin de IntelliJ IDEA (Fararoni Sentinel AI).
+  # Usa arquitectura Fire-and-Forget con CallbackServer.
+  #
+  # ARQUITECTURA:
+  #   Plugin -> POST /gateway/v1/inbound -> Gateway -> Core
+  #                                                      |
+  #   Plugin <- CallbackServer:9999 <- IntelliJEgressAdapter
+  #
+  # PLUGIN: fararoni-intellij-client
+  # CALLBACK PORT: 9999 (en el plugin)
+  #
+  # FLUJO:
+  #   1. Usuario escribe en panel de chat del plugin
+  #   2. FararoniBridge envía POST a Gateway:7071
+  #   3. Gateway procesa y Core genera respuesta
+  #   4. IntelliJEgressAdapter envía respuesta a CallbackServer:9999
+  #   5. Plugin muestra respuesta con efecto typing
+  # ---------------------------------------------------------------------------
+  intellij:
+    # enabled: Activa el canal de IntelliJ
+    enabled: true
+
+    # trust_level: Origen interno = confianza maxima
+    trust_level: SECURE_INTERNAL
+
+    # egress_adapter: Nombre del adaptador de egress
+    # "intellij" usa IntelliJEgressAdapter.java que envía via HTTP POST
+    # al CallbackServer del plugin (puerto 9999)
+    egress_adapter: "intellij"
+
+    # callback_url: URL del CallbackServer en el plugin
+    # El plugin inicia un servidor HTTP en este puerto para recibir respuestas
+    callback_url: "http://localhost:9999/callback"
+
+    # capabilities: Tipos de contenido soportados
+    capabilities:
+      - text
+      - code
+      - patch
+
+    # timeout_ms: Timeout para llamadas al plugin
+    timeout_ms: 5000
+
+    # retry_count: Reintentos en caso de fallo
+    retry_count: 2
+
+
+# =============================================================================
+# SECCION 3: EXTENSIONS (Modulos de Extension)
+# =============================================================================
+# Modulos opcionales que extienden las capacidades de Fararoni.
+# Se cargan via ServiceLoader (SPI) al iniciar el servidor.
+#
+# MODULOS DISPONIBLES:
+#   - voice  : Transcripcion de audio (Whisper) y sintesis de voz
+#   - vision : Analisis de imagenes (GPT-4V, Gemini Vision)
+# =============================================================================
+
+extensions:
+
+  # ---------------------------------------------------------------------------
+  # 3.1 VOICE - Extension de Voz (STT/TTS)
+  # ---------------------------------------------------------------------------
+  # Procesa notas de voz recibidas de WhatsApp/Telegram.
+  # Usa Whisper para transcribir audio a texto.
+  #
+  # FLUJO:
+  #   Audio (Base64) -> WhisperService -> Texto -> OmniChannelRouter
+  #
+  # MODULO: fararoni-extension-voice
+  # ---------------------------------------------------------------------------
+  voice:
+    # enabled: Activa el procesamiento de audio
+    enabled: true
+
+    # stt_provider: Motor de Speech-to-Text
+    # Valores:
+    #   - "whisper-jni" : Whisper local via JNI (recomendado)
+    #   - "openai"      : API de OpenAI Whisper (requiere API key)
+    stt_provider: "whisper-jni"
+
+    # model: Modelo de Whisper a usar
+    # Valores: tiny, base, small, medium, large
+    # Sufijos: .en (solo ingles), sin sufijo (multilenguaje)
+    # Ejemplos: "base.en", "small", "medium.en"
+    # Mayor modelo = mejor precision, mas lento
+    model: "base.en"
+
+  # ---------------------------------------------------------------------------
+  # 3.2 VISION - Extension de Vision (Analisis de Imagenes)
+  # ---------------------------------------------------------------------------
+  # Procesa imagenes recibidas de WhatsApp/Telegram.
+  # Usa modelos multimodales para describir y analizar imagenes.
+  #
+  # FLUJO:
+  #   Imagen (Base64) -> VisionService -> Descripcion -> OmniChannelRouter
+  #
+  # MODULO: fararoni-extension-vision
+  # ---------------------------------------------------------------------------
+  vision:
+    # enabled: Activa el procesamiento de imagenes
+    enabled: true
+
+    # provider: Proveedor de vision artificial
+    # Valores:
+    #   - "openai"    : GPT-4 Vision (requiere OPENAI_API_KEY)
+    #   - "gemini"    : Google Gemini Pro Vision
+    #   - "ollama"    : Local vision model (e.g. qwen3.5)
+    provider: "openai"
+
+
+# =============================================================================
+# REFERENCIA RAPIDA DE PUERTOS
+# =============================================================================
+#
+#   Puerto  | Servicio              | Descripcion
+#   --------|----------------------|------------------------------------
+#   7070    | CLI Server           | API REST interna, WebSocket
+#   7071    | Gateway REST         | Ingress/Egress para Sidecars
+#   3000    | Sidecar WhatsApp     | Node.js + Baileys
+#   3001    | Sidecar Telegram     | Node.js + Telegraf
+#   3002    | Sidecar Discord      | Node.js + discord.js
+#   3003    | Sidecar iMessage     | Node.js + BlueBubbles
+#
+# =============================================================================
+# FIN DEL ARCHIVO
+# =============================================================================

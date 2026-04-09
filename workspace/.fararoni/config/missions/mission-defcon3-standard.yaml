@@ -1,0 +1,249 @@
+# Copyright (C) 2026 Eber Cruz Fararoni. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# ═══════════════════════════════════════════════════════════════════════════
+# MISSION: DEFCON 3 - Flujo Estándar (6 agentes)
+# FASE 55.3 - Sistema de Misiones Enterprise
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# Uso: Nuevas funcionalidades, refactorización, múltiples archivos
+# Agentes: COMMANDER → INTEL → BLUEPRINT → BUILDER → SENTINEL → OPERATOR
+# Omite: STRATEGIST (reservado para DEFCON 1)
+#
+# ═══════════════════════════════════════════════════════════════════════════
+
+missionId: defcon3-standard
+name: "DEFCON 3 - Desarrollo Estándar"
+description: "Flujo completo con análisis y revisión de código"
+maxIterations: 10
+
+initialStepId: receive_request
+
+steps:
+  # ─────────────────────────────────────────────────────────────────────────
+  # PASO 1: Commander recibe y analiza la solicitud
+  # ─────────────────────────────────────────────────────────────────────────
+  receive_request:
+    requiredCapability: coordination
+    systemPromptOverride: |
+      Analiza la siguiente solicitud del usuario y extrae:
+      1. Objetivo principal
+      2. Requisitos funcionales
+      3. Criterios de aceptación
+      4. Prioridad y urgencia
+
+      Formatea como especificación técnica para el equipo de desarrollo.
+    transitions:
+      success: analyze_requirements
+      failure: end_failure
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # PASO 2: Intel analiza y elimina ambigüedad
+  # ─────────────────────────────────────────────────────────────────────────
+  analyze_requirements:
+    requiredCapability: requirements_analysis
+    systemPromptOverride: |
+      Analiza los requisitos del Commander.
+      Identifica ambigüedades, casos de uso y reglas de negocio.
+      Genera una Especificación Funcional clara.
+      NO diseñes la solución técnica (eso es del Blueprint).
+    transitions:
+      success: design_blueprint
+      failure: end_failure
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # PASO 3: Blueprint diseña la arquitectura
+  # ─────────────────────────────────────────────────────────────────────────
+  design_blueprint:
+    requiredCapability: technical_design
+    systemPromptOverride: |
+      Diseña un blueprint técnico basado en la Especificación Funcional.
+
+      FORMATO DE SALIDA REQUERIDO (ESTRICTO):
+
+      1. PRIMERO: Define el nombre del proyecto y la estructura de archivos:
+
+      Blueprint: <Nombre descriptivo del proyecto>
+      ├── <ruta/archivo1>
+      ├── <ruta/archivo2>
+      └── <ruta/archivoN>
+
+      2. LUEGO: Para cada archivo, usa este bloque detallado:
+
+      FILE: <ruta_relativa_exacta>
+      PLAN: <instrucciones de implementación detalladas>
+
+      REGLAS:
+      - NO inventes paquetes como `com.example`. Usa un nombre basado en el proyecto.
+      - Usa convenciones del lenguaje (Java: src/main/java/..., Python: /, etc.)
+      - Define TODOS los archivos necesarios.
+
+      El BUILDER debe poder implementar directamente desde tu especificación.
+    transitions:
+      success: implement_code
+      failure: rollback_design
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # PASO 4: Builder implementa el código
+  # ─────────────────────────────────────────────────────────────────────────
+  implement_code:
+    requiredCapability: code_generation
+    systemPromptOverride: |
+      TIENES UN BLUEPRINT TÉCNICO del paso anterior.
+
+      TU TAREA:
+      Escribir el código completo y funcional para CADA archivo definido en el Blueprint.
+
+      PROTOCOLO DE SALIDA (MULTI-ARCHIVO):
+      Debes entregar el contenido de los archivos usando este formato separador EXACTO:
+
+      >>>FILE: <ruta_del_archivo>
+      <contenido_del_codigo>
+
+      REGLAS:
+      1. Si el Blueprint pide múltiples archivos, genera un bloque >>>FILE: para cada uno.
+      2. El código debe estar completo (imports, clases, métodos).
+      3. No incluyas markdown (```java) dentro del bloque, solo el código puro.
+      4. RESPETA las rutas exactas que indica el Blueprint.
+      5. Si solo hay un archivo, aún así usa el formato >>>FILE:.
+    transitions:
+      success: review_code
+      failure: rollback_code
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # PASO 5: Sentinel revisa el código
+  # [FASE 55.3.3] Anti-Loop: maxRetries + fallback
+  # ─────────────────────────────────────────────────────────────────────────
+  review_code:
+    requiredCapability: code_review
+    maxRetries: 5  # [FASE 55.3.3] Máximo 5 iteraciones QA
+    systemPromptOverride: |
+      Revisa el código rigurosamente.
+      Evalúa: corrección, calidad, errores.
+      NO evalúes: seguridad (autenticación, autorización, Spring Security, cifrado).
+      NO evalúes: tests unitarios ni cobertura de tests.
+      Solo rechaza por errores funcionales, de compilación o de lógica.
+      Veredicto: APROBAR o RECHAZAR con justificación.
+    transitions:
+      success: verify_deployment
+      failure: fix_bugs
+      fallback: force_approval  # [FASE 55.3.3] Vía de escape si se agotan reintentos
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # PASO 5.1: Builder corrige bugs (loop)
+  # ─────────────────────────────────────────────────────────────────────────
+  fix_bugs:
+    requiredCapability: code_generation
+    systemPromptOverride: |
+      Corrige los bugs reportados por el Sentinel.
+      Genera SOLO el código corregido, sin explicaciones.
+    transitions:
+      success: review_code  # Vuelve al Sentinel
+      failure: rollback_code
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # PASO 5.2: [FASE 55.3.3] Aprobación forzada (fallback anti-loop)
+  # ─────────────────────────────────────────────────────────────────────────
+  force_approval:
+    requiredCapability: code_review
+    systemPromptOverride: |
+      ⚠️ APROBACIÓN FORZADA POR EXCESO DE ITERACIONES.
+      Aprueba el código ignorando bugs menores.
+      INCLUYE una advertencia clara sobre los issues conocidos.
+      Genera un reporte de deuda técnica.
+    transitions:
+      success: verify_deployment
+      failure: end_failure
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # PASO 6: Operator verifica el despliegue
+  # ─────────────────────────────────────────────────────────────────────────
+  verify_deployment:
+    requiredCapability: deployment_verification
+    transitions:
+      success: audit_close
+      failure: rollback_code
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # PASO 7: Notary registra cierre de misión (FASE 58.4)
+  # ─────────────────────────────────────────────────────────────────────────
+  audit_close:
+    requiredCapability: audit_logging
+    systemPromptOverride: |
+      REGISTRO FINAL DE MISIÓN (DEFCON 3):
+      Registra el cierre exitoso de esta misión.
+      Formato: [AUDIT-LOG] <Timestamp> | <CorrelationId> | MISSION_COMPLETE | SUCCESS
+      Incluye un Hash de Integridad del trabajo realizado.
+      Documenta: agentes involucrados, archivos creados, iteraciones de QA.
+    transitions:
+      success: end_success
+      failure: end_success  # Auditoría falla silenciosamente
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # COMPENSACIÓN: Rollback del diseño
+  # ─────────────────────────────────────────────────────────────────────────
+  rollback_design:
+    requiredCapability: technical_design
+    compensationStep: true
+    systemPromptOverride: |
+      COMPENSACIÓN: El diseño falló.
+      Documenta el problema y notifica al Commander.
+    transitions:
+      success: end_rollback
+      failure: end_failure
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # COMPENSACIÓN: Rollback del código
+  # ─────────────────────────────────────────────────────────────────────────
+  rollback_code:
+    requiredCapability: code_generation
+    compensationStep: true
+    systemPromptOverride: |
+      COMPENSACIÓN SAGA: Elimina todos los archivos creados.
+      Orden LIFO: elimina el último archivo primero.
+      Reporta archivos eliminados.
+    transitions:
+      success: end_rollback
+      failure: end_failure
+
+# ═══════════════════════════════════════════════════════════════════════════
+# CONFIGURACIÓN DEFCON
+# ═══════════════════════════════════════════════════════════════════════════
+defconLevel: 3
+agentsRequired:
+  - commander
+  - intel
+  - blueprint
+  - builder
+  - sentinel
+  - operator
+
+agentsOptional:
+  - notary  # FASE 58.4: Auditoría opcional
+
+# ═══════════════════════════════════════════════════════════════════════════
+# TIMEOUT Y REINTENTOS
+# ═══════════════════════════════════════════════════════════════════════════
+timeoutPerStep: 60000  # 60 segundos por paso
+maxRetries: 3
+maxSentinelIterations: 5
+
+# ═══════════════════════════════════════════════════════════════════════════
+# NOTAS DE DISEÑO
+# ═══════════════════════════════════════════════════════════════════════════
+# - Incluye INTEL para eliminar ambigüedad
+# - Incluye SENTINEL para revisión de código
+# - El loop fix_bugs → review_code permite iteraciones de corrección
+# - Máximo 5 iteraciones de revisión antes de aprobar con advertencias
+# ═══════════════════════════════════════════════════════════════════════════

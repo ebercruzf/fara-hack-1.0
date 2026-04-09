@@ -1,0 +1,53 @@
+# ═══════════════════════════════════════════════════════════════════
+# CONFIGURACION DE SEGURIDAD - FARARONI FASE 45
+# ═══════════════════════════════════════════════════════════════════
+#
+# Este archivo define el control de acceso para canales externos
+# (WhatsApp, Telegram, Matrix).
+#
+# Ubicacion: ~/.fararoni/config/security.yaml
+# ═══════════════════════════════════════════════════════════════════
+
+security:
+  # ─────────────────────────────────────────────────────────────────
+  # OWNER: Propietario del sistema con acceso total
+  # ─────────────────────────────────────────────────────────────────
+  owner: "+521234567890"
+
+  # ─────────────────────────────────────────────────────────────────
+  # ALLOWLIST: Contactos autorizados
+  # Formato WhatsApp: +521234567890
+  # Formato Matrix: @user:server.com
+  # ─────────────────────────────────────────────────────────────────
+  allowlist:
+    - id: "+521111111111"
+      note: "Cliente VIP"
+    - id: "+522222222222"
+      note: "Soporte Tecnico"
+    # - id: "@admin:matrix.local"
+    #   note: "Admin Matrix"
+
+  # ─────────────────────────────────────────────────────────────────
+  # GROUPS: Grupos autorizados
+  # Formato WhatsApp: 120363XXXXXXXXXX@g.us
+  # Formato Matrix: !roomid:server.com
+  # ─────────────────────────────────────────────────────────────────
+  groups:
+    # - id: "120363123456789012345@g.us"
+    #   note: "Grupo Ventas"
+    # - id: "!abc123:matrix.local"
+    #   note: "Sala Comandos"
+
+  # ─────────────────────────────────────────────────────────────────
+  # PAIRING: Configuracion de emparejamiento
+  # ─────────────────────────────────────────────────────────────────
+  pairing:
+    # Maximo de solicitudes pendientes simultaneas
+    max_pending: 3
+
+    # Horas hasta que expira un codigo de pairing
+    expiry_hours: 1
+
+    # Auto-aprobar contactos que esten en la lista del owner
+    # (Solo aplica si el canal soporta leer contactos)
+    auto_approve_owner_contacts: false

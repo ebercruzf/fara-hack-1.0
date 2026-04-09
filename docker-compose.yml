@@ -1,0 +1,166 @@
+# fara-hack-1.0 — Docker Compose for AgentX Hackathon submission
+# Run with: docker compose up --build
+# Stop with: docker compose down
+# Wipe state: docker compose down -v
+#
+# Architecture (3 services):
+#   1. nats      — NATS JetStream broker (event bus, internal only)
+#   2. fara-hack — Java 25 backend (Javalin REST + WebSocket Live Feed)
+#   3. web       — Angular 20 frontend served by Nginx, proxies to backend
+#
+# The web container is the ONLY entrypoint exposed to the host.
+# Backend port 8080 is internal to the compose network — Nginx proxies
+# /api and /ws through the web container, satisfying the contest rule
+# "only necessary ports exposed".
+
+services:
+  # ──────────────────────────────────────────────────────────────────
+  # NATS JetStream — event bus (internal only)
+  # ──────────────────────────────────────────────────────────────────
+  nats:
+    image: nats:2-alpine
+    container_name: fara-hack-nats
+    command:
+      - "-js"
+      - "-sd"
+      - "/data"
+      - "--http_port"
+      - "8222"
+    volumes:
+      - nats-data:/data
+    expose:
+      - "4222"
+      - "8222"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:8222/healthz"]
+      interval: 5s
+      timeout: 2s
+      retries: 5
+    restart: unless-stopped
+
+  # ──────────────────────────────────────────────────────────────────
+  # Fara-Hack backend — Java 25, Javalin, in-process MCP bridges
+  # ──────────────────────────────────────────────────────────────────
+  fara-hack:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: fara-hack:1.0.0
+    container_name: fara-hack-app
+    depends_on:
+      nats:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      TZ: "America/Mexico_City"
+      NATS_URL: "nats://nats:4222"
+      HACK_HTTP_PORT: "8080"
+      FARARONI_PLUGIN_TOKEN: "${FARARONI_PLUGIN_TOKEN:-demo-token-change-me}"
+      MCP_FS_SANDBOX: "/sandbox"
+      MITIGATION_PROPOSAL_ENABLED: "${MITIGATION_PROPOSAL_ENABLED:-true}"
+
+      # ── fararoni-core LLM (HiveMind reasoning step) ──────────────
+      # Legacy v2-monorepo variables. Kept for backward compatibility
+      # with anyone still running against the v2 monorepo internal jar.
+      LLM_SERVER_URL: "${LLM_SERVER_URL:-http://host.docker.internal:11434}"
+      LLM_MODEL_NAME: "${LLM_MODEL_NAME:-qwen3.5:35b-a3b}"
+      LLM_API_KEY: "${LLM_API_KEY:-}"
+
+      # ── fararoni-core public jar — model selection (Apache 2.0) ──
+      # The public fararoni-core 1.0.0 jar (from the fararoni-ecosystem
+      # GitHub repo) reads its own env vars defined in
+      # AppDefaults.ENV_AGENTIC_MODEL / ENV_TURTLE_MODEL / ENV_RABBIT_MODEL.
+      # The legacy LLM_MODEL_NAME above is IGNORED by the public jar.
+      #
+      # OPTIMAL SPLIT (current defaults):
+      #   * Vision adapter (LlmTriageClient.java in fara-hack):
+      #       reads OPENAI_COMPAT_MODEL → multimodal qwen3.5:35b-a3b
+      #       (only multimodal model in the local Ollama install).
+      #   * Agentic execution (DirectAgentExecutor → FaraCoreLlmDispatcher
+      #     → expertClient): reads FARARONI_AGENTIC_MODEL or falls
+      #     back to AppDefaults.DEFAULT_AGENTIC_MODEL = "qwen2.5-coder:32b".
+      #
+      # qwen2.5-coder:32b is OPTIMAL for the agent path because it is:
+      #   - Dense (no MoE thinking-mode-eats-all-tokens problem)
+      #   - Coder-tuned (strict JSON, function/tool-calling fidelity)
+      #   - family qwen2 (most stable Qwen generation for tool use)
+      #   - 32B parameters (capable of multi-step reasoning)
+      #
+      # We keep the default unset (= use AppDefaults qwen2.5-coder:32b)
+      # because it produces the best demo runs. To override, set
+      # FARARONI_AGENTIC_MODEL in your .env file.
+      FARARONI_AGENTIC_MODEL: "${FARARONI_AGENTIC_MODEL:-}"
+      FARARONI_TURTLE_MODEL: "${FARARONI_TURTLE_MODEL:-}"
+      FARARONI_RABBIT_MODEL: "${FARARONI_RABBIT_MODEL:-}"
+
+      # ── Vision Adapter (LlmTriageClient multimodal step) ─────────
+      OPENAI_COMPAT_BASE_URL: "${OPENAI_COMPAT_BASE_URL:-http://host.docker.internal:11434/v1}"
+      OPENAI_COMPAT_MODEL: "${OPENAI_COMPAT_MODEL:-qwen3.5:35b-a3b}"
+      OPENAI_COMPAT_API_KEY: "${OPENAI_COMPAT_API_KEY:-}"
+
+      # ── Working dir for FararoniCore (context vault, etc.) ───────
+      HACK_WORKING_DIR: "/app/workspace"
+
+      # ── Mail credentials (read by EmailTransportService via ConfigPriorityResolver) ──
+      # Values come from .env (gitignored). The variable names below are
+      # the contract — see .env.example for documentation and Gmail setup.
+      # The triage-agent.yaml uses email_send/email_fetch/email_read tools
+      # which will return "no configurado" if any of these are unset
+      # (graceful degradation, no crash).
+      MAIL_HOST: "${MAIL_HOST:-}"
+      MAIL_PORT: "${MAIL_PORT:-587}"
+      MAIL_USERNAME: "${MAIL_USERNAME:-}"
+      MAIL_PASSWORD: "${MAIL_PASSWORD:-}"
+      MAIL_IMAP_HOST: "${MAIL_IMAP_HOST:-}"
+      MAIL_IMAP_PORT: "${MAIL_IMAP_PORT:-993}"
+      MAIL_SENDER: "${MAIL_SENDER:-}"
+      MAIL_SENDER_NAME: "${MAIL_SENDER_NAME:-fara-agent}"
+
+      # ── On-call engineer recipient for the Triage Broker agent ──
+      # Used in BugReportController.processReportAsync to populate the
+      # ONCALL_EMAIL field of the broker's prompt context. The real
+      # value lives in .env (gitignored). If unset, the controller
+      # falls back to the reporter's email.
+      ONCALL_EMAIL: "${ONCALL_EMAIL:-}"
+    expose:
+      - "8080"  # internal only — Nginx proxies through
+    volumes:
+      - mcp-fs-sandbox:/sandbox
+      - ${ESHOP_REPO_PATH:-./mock-eshop}:/repo:ro
+      # Persistent workspace for FararoniCore (context vault, agent state)
+      - ./workspace:/app/workspace
+    extra_hosts:
+      # Lets the container reach Ollama running on the host machine.
+      # On Linux this is mapped via host-gateway. On macOS/Windows
+      # Docker Desktop already provides host.docker.internal natively.
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 256M
+
+  # ──────────────────────────────────────────────────────────────────
+  # Fara-Hack web — Angular 20 served by Nginx (only host-exposed port)
+  # ──────────────────────────────────────────────────────────────────
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    image: fara-hack-web:1.0.0
+    container_name: fara-hack-web
+    depends_on:
+      fara-hack:
+        condition: service_started
+    ports:
+      - "${HACK_WEB_PORT:-8080}:80"
+    restart: unless-stopped
+
+volumes:
+  nats-data:
+  mcp-fs-sandbox:

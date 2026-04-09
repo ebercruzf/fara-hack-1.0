@@ -1,0 +1,225 @@
+# Copyright (c) 2026 Eber Cruz Fararoni — MIT License
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# MISSION: CODE GENERAL — Agente de Código Soberano
+# Doc 38 — Flujo completo: entender → explorar → planificar → implementar
+#          → verificar → entregar
+# ═══════════════════════════════════════════════════════════════════════════
+
+missionId: code-general
+name: "Agente de Código General"
+description: "Flujo completo de ingeniería de software con exploración AST, verificación adversarial obligatoria, y entrega estructurada"
+maxIterations: 10
+
+initialStepId: understand_request
+
+steps:
+  # ─────────────────────────────────────────────────────────────────────
+  # PASO 1: Commander entiende la solicitud
+  # ─────────────────────────────────────────────────────────────────────
+  understand_request:
+    requiredCapability: coordination
+    systemPromptOverride: |
+      Analiza la solicitud del usuario y extrae:
+      1. Objetivo principal (qué quiere lograr)
+      2. Archivos o módulos mencionados
+      3. Restricciones explícitas o implícitas
+      4. Tipo de tarea: crear / modificar / debuggear / explicar / ejecutar
+
+      Formatea como especificación clara para el equipo de desarrollo.
+      NO propongas soluciones técnicas — eso es tarea del siguiente paso.
+    transitions:
+      success: explore_codebase
+      failure: end_failure
+
+  # ─────────────────────────────────────────────────────────────────────
+  # PASO 2: Exploración del codebase con AST + ContextServer
+  # ─────────────────────────────────────────────────────────────────────
+  explore_codebase:
+    requiredCapability: code_analysis
+    dependsOn: [understand_request]
+    systemPromptOverride: |
+      Antes de proponer cualquier cambio, investiga el terreno:
+
+      PROTOCOLO DE EXPLORACIÓN:
+      1. Identifica archivos mencionados en la solicitud → léelos
+      2. Usa ast_query para buscar métodos y clases relacionados
+      3. Usa symbol_lookup para encontrar dependencias y usos
+      4. Busca funcionalidades análogas (heredar convenciones existentes)
+      5. Traza la cadena de llamadas que será afectada
+
+      NO EMPIECES A DISEÑAR. Solo investiga y documenta:
+      - Archivos leídos y su propósito
+      - Dependencias encontradas
+      - Patrones y convenciones observadas
+      - Posibles impactos del cambio propuesto
+    transitions:
+      success: plan_implementation
+      failure: end_failure
+
+  # ─────────────────────────────────────────────────────────────────────
+  # PASO 3: Blueprint diseña la implementación
+  # ─────────────────────────────────────────────────────────────────────
+  plan_implementation:
+    requiredCapability: technical_design
+    dependsOn: [explore_codebase]
+    systemPromptOverride: |
+      Con base en la exploración, diseña la implementación:
+
+      RECONOCIMIENTO PREVIO (usa los hallazgos del paso anterior):
+      1. ¿Hay funcionalidades análogas? Úsalas como modelo.
+      2. ¿Qué convenciones sigue el proyecto? Respétalas.
+      3. ¿Qué componentes puedes reutilizar en lugar de recrear?
+
+      FORMATO DE SALIDA:
+      1. ARCHIVOS A CREAR/MODIFICAR (lista con rutas completas)
+      2. PARA CADA ARCHIVO:
+         >>>FILE: <ruta_completa>
+         <código_fuente_puro>
+      3. COMPROMISOS DE DISEÑO:
+         - Decisión tomada vs alternativa descartada (y razón)
+         - 3-5 archivos que el Builder debe priorizar
+
+      RESTRICCIONES:
+      - No uses bloques markdown dentro de >>>FILE:
+      - Código completo (imports, clases, métodos)
+      - Si el proyecto tiene convenciones, síguelas
+    transitions:
+      success: implement_code
+      failure: end_failure
+
+  # ─────────────────────────────────────────────────────────────────────
+  # PASO 4: Builder implementa el código
+  # ─────────────────────────────────────────────────────────────────────
+  implement_code:
+    requiredCapability: code_generation
+    dependsOn: [plan_implementation]
+    systemPromptOverride: |
+      Implementa el código basándote en el blueprint del paso anterior.
+
+      PROTOCOLO DE ESCRITURA:
+      Para cada archivo, usa este formato separador EXACTO:
+      >>>FILE: <ruta_del_archivo>
+      <contenido_del_código>
+
+      REGLAS:
+      1. Genera un bloque >>>FILE: para cada archivo.
+      2. El código debe estar completo (imports, clases, métodos).
+      3. No incluyas markdown (```java) dentro del bloque.
+      4. Respeta las rutas exactas del blueprint.
+    transitions:
+      success: verify_code
+      failure: rollback_code
+
+  # ─────────────────────────────────────────────────────────────────────
+  # PASO 5: Sentinel verifica adversarialmente
+  # ─────────────────────────────────────────────────────────────────────
+  verify_code:
+    requiredCapability: code_review
+    dependsOn: [implement_code]
+    maxRetries: 3
+    systemPromptOverride: |
+      Inspecciona el código con intención de encontrar fallos, no de
+      confirmar que funciona.
+
+      SONDEOS OBLIGATORIOS:
+      1. FLUJO: Traza input→output. ¿Llega al resultado correcto?
+      2. FRONTERAS: ¿Qué pasa con null, vacío, negativo, máximo?
+      3. ERRORES: ¿Cada operación riesgosa tiene catch útil?
+      4. CONCURRENCIA: ¿Estado mutable compartido entre hilos?
+      5. RECURSOS: ¿Streams/conexiones se cierran correctamente?
+      6. IDEMPOTENCIA: ¿Dos ejecuciones = resultado correcto?
+
+      NO evalúes seguridad (autenticación, cifrado).
+      NO evalúes cobertura de tests.
+
+      FORMATO: [ARCHIVO:LÍNEA] SEVERIDAD — Descripción — Impacto
+      VEREDICTO: APROBADO (sin BLOQUEANTES) o RECHAZADO (con evidencia)
+    transitions:
+      success: deliver_result
+      failure: fix_code
+      fallback: force_deliver
+
+  # ─────────────────────────────────────────────────────────────────────
+  # PASO 5.1: Builder corrige bugs encontrados por Sentinel
+  # ─────────────────────────────────────────────────────────────────────
+  fix_code:
+    requiredCapability: code_generation
+    systemPromptOverride: |
+      El Sentinel rechazó el código. Corrige los hallazgos reportados.
+      Genera SOLO el código corregido usando formato >>>FILE:
+      No hagas cambios adicionales fuera de los hallazgos.
+    transitions:
+      success: verify_code
+      failure: rollback_code
+
+  # ─────────────────────────────────────────────────────────────────────
+  # PASO 5.2: Entrega forzada (fallback anti-loop)
+  # ─────────────────────────────────────────────────────────────────────
+  force_deliver:
+    requiredCapability: code_review
+    systemPromptOverride: |
+      Se agotaron los intentos de corrección.
+      Aprueba con advertencias claras sobre hallazgos conocidos.
+      Genera reporte de riesgo residual.
+    transitions:
+      success: deliver_result
+      failure: end_failure
+
+  # ─────────────────────────────────────────────────────────────────────
+  # PASO 6: Entrega estructurada con Notary
+  # ─────────────────────────────────────────────────────────────────────
+  deliver_result:
+    requiredCapability: audit_logging
+    dependsOn: [verify_code]
+    systemPromptOverride: |
+      REPORTE FINAL DE TAREA COMPLETADA:
+
+      Formato:
+      [AUDIT-LOG] <Timestamp> | <CorrelationId> | TASK_COMPLETE
+
+      Documenta:
+      - Objetivo de la tarea
+      - Archivos creados/modificados
+      - Resultado de verificación (compilación + Sentinel)
+      - Hash de integridad de cada archivo
+      - Pendientes si los hay
+    transitions:
+      success: end_success
+      failure: end_success
+
+  # ─────────────────────────────────────────────────────────────────────
+  # COMPENSACIÓN: Rollback del código
+  # ─────────────────────────────────────────────────────────────────────
+  rollback_code:
+    requiredCapability: code_generation
+    compensationStep: true
+    systemPromptOverride: |
+      COMPENSACIÓN SAGA: La implementación falló verificación.
+      Revierte los cambios al estado anterior.
+      Reporta archivos restaurados.
+    transitions:
+      success: end_rollback
+      failure: end_failure
+
+# ═══════════════════════════════════════════════════════════════════════════
+# CONFIGURACIÓN DEFCON
+# ═══════════════════════════════════════════════════════════════════════════
+defconLevel: 3
+agentsRequired:
+  - commander
+  - code-agent
+  - sentinel
+  - builder
+
+agentsOptional:
+  - intel
+  - operator
+  - notary
+
+# ═══════════════════════════════════════════════════════════════════════════
+# TIMEOUT Y REINTENTOS
+# ═══════════════════════════════════════════════════════════════════════════
+timeoutPerStep: 90000
+maxRetries: 3
+maxSentinelIterations: 3

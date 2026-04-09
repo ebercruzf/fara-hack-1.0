@@ -1,0 +1,338 @@
+<mxfile host="app.diagrams.net" modified="2026-04-09" agent="fara-hack" version="24.0.0" type="device">
+  <diagram id="fara-hack-arch" name="System Architecture">
+    <mxGraphModel dx="1800" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ==================== HOST ==================== -->
+        <mxCell id="host" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="20" y="20" width="1560" height="1150" as="geometry" />
+        </mxCell>
+        <mxCell id="host_label" value="&lt;b&gt;Host Machine&lt;/b&gt; (macOS / Linux)" style="text;html=1;align=left;verticalAlign=top;fontSize=14;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="30" width="300" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== BROWSER ==================== -->
+        <mxCell id="browser" value="&lt;b&gt;Browser&lt;/b&gt;&lt;br&gt;http://localhost:8080" style="shape=mxgraph.cisco.computers_and_peripherals.laptop;sketch=0;fillColor=#d5e8d4;strokeColor=#82b366;html=1;whiteSpace=wrap;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="40" y="100" width="120" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== DOCKER COMPOSE NETWORK ==================== -->
+        <mxCell id="docker" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e6f2ff;strokeColor=#1565c0;strokeWidth=2;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="220" y="70" width="900" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="docker_label" value="&lt;b&gt;Docker Compose Network&lt;/b&gt; (isolated)" style="text;html=1;align=left;verticalAlign=top;fontSize=13;fontColor=#1565c0;" vertex="1" parent="1">
+          <mxGeometry x="240" y="78" width="300" height="25" as="geometry" />
+        </mxCell>
+
+        <!-- ====== WEB CONTAINER ====== -->
+        <mxCell id="web_container" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;arcSize=10;" vertex="1" parent="1">
+          <mxGeometry x="250" y="110" width="250" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="web_label" value="&lt;b&gt;web&lt;/b&gt; container&lt;br&gt;&lt;font color=&quot;#999&quot;&gt;fara-hack-web:1.0.0&lt;/font&gt;" style="text;html=1;align=center;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="275" y="115" width="200" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="angular" value="&lt;b&gt;Angular 20.3&lt;/b&gt;&lt;br&gt;Standalone SPA&lt;br&gt;Bug Report Form&lt;br&gt;+ Reasoning Trace" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="265" y="155" width="110" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="nginx" value="&lt;b&gt;Nginx 1.27&lt;/b&gt;&lt;br&gt;Reverse Proxy&lt;br&gt;/api → :8080&lt;br&gt;/ws → upgrade" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="385" y="155" width="100" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="port_8080" value="&lt;b&gt;:8080&lt;/b&gt;&lt;br&gt;(only exposed port)" style="text;html=1;align=center;fontSize=9;fontColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="310" y="280" width="130" height="25" as="geometry" />
+        </mxCell>
+
+        <!-- ====== FARA-HACK CONTAINER ====== -->
+        <mxCell id="app_container" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="250" y="340" width="550" height="410" as="geometry" />
+        </mxCell>
+        <mxCell id="app_label" value="&lt;b&gt;fara-hack&lt;/b&gt; container &amp;nbsp;|&amp;nbsp; Java 25 + Virtual Threads &amp;nbsp;|&amp;nbsp; :8080 internal" style="text;html=1;align=center;fontSize=11;fontColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="310" y="345" width="430" height="25" as="geometry" />
+        </mxCell>
+
+        <!-- Controller -->
+        <mxCell id="ctrl" value="&lt;b&gt;BugReportController&lt;/b&gt;&lt;br&gt;REST + WebSocket&lt;br&gt;Live Feed" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="270" y="380" width="140" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Vision -->
+        <mxCell id="vision" value="&lt;b&gt;LlmTriageClient&lt;/b&gt;&lt;br&gt;Vision Adapter&lt;br&gt;&lt;font color=&quot;#2e7d32&quot;&gt;qwen3.5:35b-a3b&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#2e7d32;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="270" y="460" width="140" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- DirectAgentExecutor -->
+        <mxCell id="dae" value="&lt;b&gt;DirectAgentExecutor&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#1565c0&quot;&gt;qwen2.5-coder:32b&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e3f2fd;strokeColor=#1565c0;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="270" y="535" width="140" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- 4 Agents -->
+        <mxCell id="agents_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3e5f5;strokeColor=#6a1b9a;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="430" y="380" width="350" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="agents_label" value="&lt;b&gt;4-Agent Pipeline&lt;/b&gt; (YAML-driven, Virtual Threads)" style="text;html=1;align=center;fontSize=10;fontColor=#6a1b9a;" vertex="1" parent="1">
+          <mxGeometry x="460" y="385" width="290" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="agent_coord" value="&lt;b&gt;triage-coordinator&lt;/b&gt;&lt;br&gt;Severity P0-P3&lt;br&gt;tools: fs_read" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff;strokeColor=#6a1b9a;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="445" y="410" width="130" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="agent_forensic" value="&lt;b&gt;forensic-analyst&lt;/b&gt;&lt;br&gt;Duplicates + Owner&lt;br&gt;&lt;font color=&quot;#6a1b9a&quot;&gt;‖ parallel&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff;strokeColor=#6a1b9a;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="445" y="470" width="130" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="agent_mitigation" value="&lt;b&gt;mitigation-engineer&lt;/b&gt;&lt;br&gt;Patch proposal&lt;br&gt;&lt;font color=&quot;#6a1b9a&quot;&gt;‖ parallel&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff;strokeColor=#6a1b9a;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="590" y="470" width="130" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="agent_broker" value="&lt;b&gt;triage-broker&lt;/b&gt;&lt;br&gt;ticket_create + email_send" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff;strokeColor=#6a1b9a;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="530" y="530" width="150" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- TicketStore -->
+        <mxCell id="ticket" value="&lt;b&gt;TicketStore&lt;/b&gt;&lt;br&gt;FH-1, FH-2...&lt;br&gt;(in-memory)" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#fff;strokeColor=#6c8ebf;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="270" y="610" width="90" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Email -->
+        <mxCell id="email" value="&lt;b&gt;EmailTransport&lt;/b&gt;&lt;br&gt;Gmail SMTP" style="shape=mxgraph.signs.healthcare.first_aid_1;whiteSpace=wrap;html=1;fillColor=#fff;strokeColor=#6c8ebf;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="380" y="615" width="80" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- SovereignBusGuard -->
+        <mxCell id="bus_guard" value="&lt;b&gt;SovereignBusGuard&lt;/b&gt;&lt;br&gt;Circuit Breaker&lt;br&gt;Primary: NATS (P:100)&lt;br&gt;Standby: Chronicle (P:50)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="490" y="600" width="160" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- ====== NATS CONTAINER ====== -->
+        <mxCell id="nats_container" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff3e0;strokeColor=#e65100;arcSize=10;" vertex="1" parent="1">
+          <mxGeometry x="850" y="340" width="240" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="nats_label" value="&lt;b&gt;nats&lt;/b&gt; container&lt;br&gt;&lt;font color=&quot;#999&quot;&gt;nats:2-alpine&lt;/font&gt;" style="text;html=1;align=center;fontSize=11;fontColor=#e65100;" vertex="1" parent="1">
+          <mxGeometry x="900" y="348" width="150" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="nats_jetstream" value="&lt;b&gt;JetStream&lt;/b&gt;&lt;br&gt;Persistent Streams&lt;br&gt;AckExplicit + DLQ" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff;strokeColor=#e65100;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="870" y="385" width="120" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="nats_core" value="&lt;b&gt;Core NATS&lt;/b&gt;&lt;br&gt;Pub/Sub&lt;br&gt;Queue Groups&lt;br&gt;fararoni-workers" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff;strokeColor=#e65100;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="870" y="450" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="nats_port" value="&lt;b&gt;:4222&lt;/b&gt; (internal only)" style="text;html=1;align=center;fontSize=9;fontColor=#e65100;" vertex="1" parent="1">
+          <mxGeometry x="880" y="520" width="130" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== OLLAMA (HOST) ==================== -->
+        <mxCell id="ollama_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0f0f0;strokeColor=#999;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="250" y="820" width="860" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="ollama_label" value="&lt;b&gt;Ollama LLM Server&lt;/b&gt; (host machine :11434)" style="text;html=1;align=left;fontSize=12;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="270" y="828" width="300" height="25" as="geometry" />
+        </mxCell>
+
+        <mxCell id="qwen35" value="&lt;b&gt;qwen3.5:35b-a3b&lt;/b&gt;&lt;br&gt;&lt;br&gt;MoE · Multimodal&lt;br&gt;41 layers · 21.9 GiB&lt;br&gt;Vision / OCR&lt;br&gt;&lt;br&gt;&lt;font color=&quot;#2e7d32&quot;&gt;STEP_0_VISION&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#2e7d32;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="300" y="860" width="160" height="120" as="geometry" />
+        </mxCell>
+
+        <mxCell id="qwen25" value="&lt;b&gt;qwen2.5-coder:32b&lt;/b&gt;&lt;br&gt;&lt;br&gt;Dense · Coder-tuned&lt;br&gt;65 layers · 18.1 GiB&lt;br&gt;Tool-calling + JSON&lt;br&gt;&lt;br&gt;&lt;font color=&quot;#1565c0&quot;&gt;STEP 2 — 6 (agents)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e3f2fd;strokeColor=#1565c0;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="520" y="860" width="170" height="120" as="geometry" />
+        </mxCell>
+
+        <mxCell id="model_split_label" value="&lt;b&gt;Model Split Strategy&lt;/b&gt;&lt;br&gt;Vision → MoE multimodal&lt;br&gt;Agents → Dense coder&lt;br&gt;3-4x faster tool-calling" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=none;fontSize=10;fontColor=#666;align=left;" vertex="1" parent="1">
+          <mxGeometry x="750" y="870" width="200" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== MOCK ESHOP ==================== -->
+        <mxCell id="eshop" value="&lt;b&gt;mock-eshop&lt;/b&gt;&lt;br&gt;(bind mount /repo:ro)&lt;br&gt;&lt;br&gt;CatalogController.cs&lt;br&gt;DiscountService.cs:142 ←bug&lt;br&gt;DiscountCode.cs&lt;br&gt;&lt;br&gt;&lt;font color=&quot;#999&quot;&gt;C# eCommerce (eShop pattern)&lt;/font&gt;" style="shape=folder;whiteSpace=wrap;html=1;fillColor=#fff;strokeColor=#82b366;fontSize=10;tabWidth=80;tabHeight=20;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="100" width="200" height="160" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== OUTPUTS ==================== -->
+        <mxCell id="gmail" value="&lt;b&gt;Gmail SMTP&lt;/b&gt;&lt;br&gt;On-call alert&lt;br&gt;Reporter notification" style="shape=mxgraph.signs.transportation.mail_2;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="1200" y="340" width="100" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ws_feed" value="&lt;b&gt;WebSocket Live Feed&lt;/b&gt;&lt;br&gt;/ws/events?correlationId=X&lt;br&gt;&lt;br&gt;Real-time Reasoning Trace&lt;br&gt;(STEP_0 → DONE)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="1170" y="470" width="190" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ticket_out" value="&lt;b&gt;Ticket FH-N&lt;/b&gt;&lt;br&gt;GET /api/triage/tickets&lt;br&gt;POST .../resolve → Step 5" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="1200" y="600" width="160" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== ARROWS ==================== -->
+        <!-- Browser → Web -->
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#333;strokeWidth=2;" edge="1" source="browser" target="angular" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e1_label" value="HTTP + WS" style="edgeLabel;html=1;fontSize=9;" vertex="1" connectable="0" parent="e1">
+          <mxGeometry x="-0.2" relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+
+        <!-- Nginx → Controller -->
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#6c8ebf;strokeWidth=2;" edge="1" source="nginx" target="ctrl" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2_label" value="/api + /ws proxy" style="edgeLabel;html=1;fontSize=9;" vertex="1" connectable="0" parent="e2">
+          <mxGeometry relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+
+        <!-- Controller → Vision -->
+        <mxCell id="e3" style="rounded=1;strokeColor=#2e7d32;strokeWidth=1.5;" edge="1" source="ctrl" target="vision" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3_label" value="STEP 0" style="edgeLabel;html=1;fontSize=8;fontColor=#2e7d32;" vertex="1" connectable="0" parent="e3">
+          <mxGeometry relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+
+        <!-- Controller → DAE -->
+        <mxCell id="e4" style="rounded=1;strokeColor=#1565c0;strokeWidth=1.5;" edge="1" source="ctrl" target="dae" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4_label" value="STEP 2-6" style="edgeLabel;html=1;fontSize=8;fontColor=#1565c0;" vertex="1" connectable="0" parent="e4">
+          <mxGeometry relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+
+        <!-- DAE → Agents -->
+        <mxCell id="e5" style="rounded=1;strokeColor=#6a1b9a;strokeWidth=1.5;" edge="1" source="dae" target="agent_coord" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Coord → Forensic + Mitigation (parallel) -->
+        <mxCell id="e6a" style="rounded=1;strokeColor=#6a1b9a;strokeWidth=1;dashed=1;" edge="1" source="agent_coord" target="agent_forensic" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6b" style="rounded=1;strokeColor=#6a1b9a;strokeWidth=1;dashed=1;" edge="1" source="agent_coord" target="agent_mitigation" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Forensic + Mitigation → Broker -->
+        <mxCell id="e7a" style="rounded=1;strokeColor=#6a1b9a;strokeWidth=1;" edge="1" source="agent_forensic" target="agent_broker" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7b" style="rounded=1;strokeColor=#6a1b9a;strokeWidth=1;" edge="1" source="agent_mitigation" target="agent_broker" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- BusGuard → NATS -->
+        <mxCell id="e8" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#e65100;strokeWidth=2;" edge="1" source="bus_guard" target="nats_core" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8_label" value="pub/sub (P:100)" style="edgeLabel;html=1;fontSize=9;fontColor=#e65100;" vertex="1" connectable="0" parent="e8">
+          <mxGeometry relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+
+        <!-- Vision → Ollama qwen3.5 -->
+        <mxCell id="e9" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2e7d32;strokeWidth=2;" edge="1" source="vision" target="qwen35" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9_label" value="/v1/chat/completions&lt;br&gt;multimodal (text+image)" style="edgeLabel;html=1;fontSize=8;fontColor=#2e7d32;" vertex="1" connectable="0" parent="e9">
+          <mxGeometry relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+
+        <!-- DAE → Ollama qwen2.5 -->
+        <mxCell id="e10" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#1565c0;strokeWidth=2;" edge="1" source="dae" target="qwen25" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10_label" value="/v1/chat/completions&lt;br&gt;tool-calling JSON" style="edgeLabel;html=1;fontSize=8;fontColor=#1565c0;" vertex="1" connectable="0" parent="e10">
+          <mxGeometry relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+
+        <!-- Controller → Ticket -->
+        <mxCell id="e11" style="rounded=1;strokeColor=#6c8ebf;" edge="1" source="ctrl" target="ticket" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Controller → Email -->
+        <mxCell id="e12" style="rounded=1;strokeColor=#6c8ebf;" edge="1" source="ctrl" target="email" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- DAE → eshop (fs_read /repo) -->
+        <mxCell id="e13" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#82b366;strokeWidth=1.5;dashed=1;" edge="1" source="dae" target="eshop" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="700" y="560" />
+              <mxPoint x="1130" y="560" />
+              <mxPoint x="1130" y="180" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e13_label" value="fs_read /repo (read-only)" style="edgeLabel;html=1;fontSize=8;fontColor=#82b366;" vertex="1" connectable="0" parent="e13">
+          <mxGeometry relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+
+        <!-- Email → Gmail -->
+        <mxCell id="e14" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#b85450;strokeWidth=1.5;" edge="1" source="email" target="gmail" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Controller → WS Feed (output) -->
+        <mxCell id="e15" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#82b366;strokeWidth=1.5;" edge="1" source="ctrl" target="ws_feed" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="340" y="370" />
+              <mxPoint x="1150" y="370" />
+              <mxPoint x="1150" y="510" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e15_label" value="publishTrace()" style="edgeLabel;html=1;fontSize=8;fontColor=#82b366;" vertex="1" connectable="0" parent="e15">
+          <mxGeometry relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+
+        <!-- Ticket → Ticket output -->
+        <mxCell id="e16" style="rounded=1;strokeColor=#82b366;strokeWidth=1.5;" edge="1" source="ticket" target="ticket_out" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== LEGEND ==================== -->
+        <mxCell id="legend_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff;strokeColor=#ccc;arcSize=10;" vertex="1" parent="1">
+          <mxGeometry x="250" y="1040" width="860" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="legend_title" value="&lt;b&gt;Legend&lt;/b&gt;" style="text;html=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="270" y="1045" width="60" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="leg1" value="" style="rounded=1;fillColor=#e8f5e9;strokeColor=#2e7d32;" vertex="1" parent="1">
+          <mxGeometry x="270" y="1070" width="20" height="15" as="geometry" />
+        </mxCell>
+        <mxCell id="leg1t" value="Vision model (qwen3.5 MoE)" style="text;html=1;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="295" y="1068" width="160" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="leg2" value="" style="rounded=1;fillColor=#e3f2fd;strokeColor=#1565c0;" vertex="1" parent="1">
+          <mxGeometry x="270" y="1095" width="20" height="15" as="geometry" />
+        </mxCell>
+        <mxCell id="leg2t" value="Coder model (qwen2.5-coder dense)" style="text;html=1;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="295" y="1093" width="180" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="leg3" value="" style="rounded=1;fillColor=#fff3e0;strokeColor=#e65100;" vertex="1" parent="1">
+          <mxGeometry x="500" y="1070" width="20" height="15" as="geometry" />
+        </mxCell>
+        <mxCell id="leg3t" value="NATS Event Bus" style="text;html=1;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="525" y="1068" width="100" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="leg4" value="" style="rounded=1;fillColor=#fce4ec;strokeColor=#c62828;" vertex="1" parent="1">
+          <mxGeometry x="500" y="1095" width="20" height="15" as="geometry" />
+        </mxCell>
+        <mxCell id="leg4t" value="Circuit Breaker / Failover" style="text;html=1;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="525" y="1093" width="150" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="leg5" value="" style="rounded=1;fillColor=#f3e5f5;strokeColor=#6a1b9a;" vertex="1" parent="1">
+          <mxGeometry x="700" y="1070" width="20" height="15" as="geometry" />
+        </mxCell>
+        <mxCell id="leg5t" value="4-Agent Pipeline (Virtual Threads)" style="text;html=1;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="725" y="1068" width="190" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="leg6" value="" style="rounded=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="700" y="1095" width="20" height="15" as="geometry" />
+        </mxCell>
+        <mxCell id="leg6t" value="Frontend (Angular 20 + Nginx)" style="text;html=1;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="725" y="1093" width="180" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Author -->
+        <mxCell id="author" value="&lt;b&gt;Fara-Hack 1.0&lt;/b&gt; — Sovereign Agentic Runtime | &lt;b&gt;Author:&lt;/b&gt; Eber Cruz | &lt;b&gt;License:&lt;/b&gt; MIT | #AgentXHackathon" style="text;html=1;align=center;fontSize=10;fontColor=#666;" vertex="1" parent="1">
+          <mxGeometry x="350" y="1160" width="600" height="20" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

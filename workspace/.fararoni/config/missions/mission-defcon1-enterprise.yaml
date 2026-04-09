@@ -1,0 +1,323 @@
+# Copyright (C) 2026 Eber Cruz Fararoni. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# ═══════════════════════════════════════════════════════════════════════════
+# MISSION: DEFCON 1 - Flujo Enterprise Completo (7 agentes)
+# FASE 55.3 - Sistema de Misiones Enterprise
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# Uso: Arquitectura completa, pagos, autenticación, bases de datos, cloud
+# Agentes: COMMANDER → INTEL → STRATEGIST → BLUEPRINT → BUILDER → SENTINEL → OPERATOR
+# Incluye: Todos los agentes con poder de VETO del Strategist
+#
+# ═══════════════════════════════════════════════════════════════════════════
+
+missionId: defcon1-enterprise
+name: "DEFCON 1 - Desarrollo Enterprise"
+description: "Flujo máximo con validación estratégica y poder de veto"
+maxIterations: 15
+
+initialStepId: receive_request
+
+steps:
+  # ─────────────────────────────────────────────────────────────────────────
+  # PASO 1: Commander recibe y analiza la solicitud
+  # ─────────────────────────────────────────────────────────────────────────
+  receive_request:
+    requiredCapability: coordination
+    systemPromptOverride: |
+      Analiza la siguiente solicitud del usuario y extrae:
+      1. Objetivo principal
+      2. Requisitos funcionales
+      3. Criterios de aceptación
+      4. Prioridad y urgencia
+
+      Como es DEFCON 1 (máxima complejidad), incluye también:
+      5. Requisitos no funcionales
+      6. Consideraciones de seguridad
+      7. Aspectos de escalabilidad
+
+      Formatea como especificación técnica para el equipo de desarrollo.
+    transitions:
+      success: analyze_requirements
+      failure: end_failure
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # PASO 2: Intel analiza y elimina ambigüedad
+  # ─────────────────────────────────────────────────────────────────────────
+  analyze_requirements:
+    requiredCapability: requirements_analysis
+    systemPromptOverride: |
+      DEFCON 1: Análisis exhaustivo de requisitos.
+      - Identifica TODAS las ambigüedades
+      - Lista Happy Path, Edge Cases, Error Cases
+      - Define reglas de negocio estrictas
+      - Criterios de aceptación detallados
+    transitions:
+      success: validate_strategy
+      failure: end_failure
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # PASO 3: Strategist valida viabilidad (puede VETAR)
+  # ─────────────────────────────────────────────────────────────────────────
+  validate_strategy:
+    requiredCapability: system_design
+    systemPromptOverride: |
+      DEFCON 1: Validación estratégica obligatoria.
+
+      Evalúa:
+      1. VIABILIDAD TÉCNICA: ¿Es factible? (SI/NO)
+      2. RIESGOS: Seguridad, escalabilidad, mantenibilidad
+      3. PATRONES: Define patrones de diseño obligatorios
+      4. ESTÁNDARES: Java 25, Records, inmutabilidad
+
+      PODER DE VETO:
+      Si NO es viable, responde "VIABILIDAD: NO" y explica por qué.
+      El proyecto será RECHAZADO y notificado al usuario.
+    transitions:
+      success: design_blueprint
+      failure: reject_project  # Strategist vetó el proyecto
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # PASO 3.1: Proyecto rechazado por Strategist
+  # ─────────────────────────────────────────────────────────────────────────
+  reject_project:
+    requiredCapability: coordination
+    systemPromptOverride: |
+      El Strategist ha VETADO el proyecto.
+      Explica al usuario por qué no es viable.
+      Sugiere alternativas si es posible.
+    transitions:
+      success: end_failure
+      failure: end_failure
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # PASO 4: Blueprint diseña la arquitectura
+  # ─────────────────────────────────────────────────────────────────────────
+  design_blueprint:
+    requiredCapability: technical_design
+    systemPromptOverride: |
+      DEFCON 1: Blueprint detallado con arquitectura completa.
+
+      Incluye en tu diseño:
+      - Estructura de paquetes/módulos
+      - Interfaces y contratos
+      - Patrones de diseño específicos
+      - Consideraciones de seguridad
+      - Plan de testing
+
+      FORMATO DE SALIDA REQUERIDO (ESTRICTO):
+
+      1. PRIMERO: Define el nombre del proyecto y la estructura de archivos:
+
+      Blueprint: <Nombre descriptivo del proyecto>
+      ├── <ruta/archivo1>
+      ├── <ruta/archivo2>
+      ├── <ruta/archivo3>
+      └── <ruta/archivoN>
+
+      2. LUEGO: Para cada archivo, usa este bloque detallado:
+
+      FILE: <ruta_relativa_exacta>
+      PLAN: <instrucciones de implementación detalladas con validaciones y seguridad>
+
+      REGLAS:
+      - NO inventes paquetes como `com.example`. Usa un nombre basado en el proyecto.
+      - Usa convenciones del lenguaje (Java: src/main/java/..., Python: /, etc.)
+      - Define TODOS los archivos necesarios (modelos, repos, services, controllers, tests).
+      - Incluye validaciones (@NotNull, @Valid) y seguridad en el PLAN.
+
+      El BUILDER debe poder implementar directamente desde tu especificación.
+    transitions:
+      success: implement_code
+      failure: rollback_design
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # PASO 5: Builder implementa el código
+  # ─────────────────────────────────────────────────────────────────────────
+  implement_code:
+    requiredCapability: code_generation
+    systemPromptOverride: |
+      DEFCON 1: Implementación de grado enterprise.
+
+      TIENES UN BLUEPRINT TÉCNICO del paso anterior.
+
+      Requisitos Enterprise:
+      - Código completo con todos los imports
+      - Manejo de errores exhaustivo
+      - Logging apropiado (SLF4J)
+      - Validaciones de entrada (@Valid, @NotNull)
+      - Documentación JavaDoc
+
+      PROTOCOLO DE SALIDA (MULTI-ARCHIVO):
+      Debes entregar el contenido de los archivos usando este formato separador EXACTO:
+
+      >>>FILE: <ruta_del_archivo>
+      <contenido_del_codigo>
+
+      REGLAS:
+      1. Si el Blueprint pide múltiples archivos, genera un bloque >>>FILE: para cada uno.
+      2. El código debe estar completo (imports, clases, métodos).
+      3. No incluyas markdown (```java) dentro del bloque, solo el código puro.
+      4. RESPETA las rutas exactas que indica el Blueprint.
+      5. Si solo hay un archivo, aún así usa el formato >>>FILE:.
+    transitions:
+      success: review_code
+      failure: rollback_code
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # PASO 6: Sentinel revisa el código
+  # ─────────────────────────────────────────────────────────────────────────
+  review_code:
+    requiredCapability: code_review
+    systemPromptOverride: |
+      DEFCON 1: Revisión exhaustiva de código.
+
+      Evalúa estrictamente:
+      1. Corrección funcional
+      2. Calidad y mantenibilidad
+      3. Manejo de errores
+      4. SEGURIDAD (crítico para DEFCON 1)
+      5. Cobertura de tests
+      6. Cumplimiento de patrones
+
+      VEREDICTO: APROBAR solo si cumple TODOS los criterios.
+    transitions:
+      success: verify_deployment
+      failure: fix_bugs
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # PASO 6.1: Builder corrige bugs
+  # ─────────────────────────────────────────────────────────────────────────
+  fix_bugs:
+    requiredCapability: code_generation
+    transitions:
+      success: review_code
+      failure: rollback_code
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # PASO 7: Operator verifica el despliegue
+  # ─────────────────────────────────────────────────────────────────────────
+  verify_deployment:
+    requiredCapability: deployment_verification
+    systemPromptOverride: |
+      DEFCON 1: Verificación exhaustiva de despliegue.
+
+      Verificar:
+      - Existencia de TODOS los archivos
+      - Permisos correctos
+      - Configuraciones aplicadas
+      - Tests pasando
+
+      NO aprobar sin evidencia empírica.
+    transitions:
+      success: audit_close
+      failure: rollback_code
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # PASO 8: Notary registra cierre de misión (FASE 58.4)
+  # ─────────────────────────────────────────────────────────────────────────
+  audit_close:
+    requiredCapability: audit_logging
+    systemPromptOverride: |
+      REGISTRO FINAL DE MISIÓN (DEFCON 1 - ENTERPRISE):
+
+      Este es un registro de Grado Militar. Documenta:
+      1. Timestamp UTC de cierre
+      2. CorrelationId de la misión
+      3. Lista de todos los agentes que participaron
+      4. Archivos creados con checksums
+      5. Iteraciones de QA realizadas
+      6. Hash de Integridad final (SHA-256)
+
+      Formato: [AUDIT-LOG] <Timestamp> | <CorrelationId> | <Agent> | <Action> | <Status>
+
+      Este registro es INMUTABLE y sirve como evidencia de compliance.
+    transitions:
+      success: end_success
+      failure: end_success  # Auditoría falla silenciosamente, nunca bloquea
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # COMPENSACIÓN: Rollback del diseño
+  # ─────────────────────────────────────────────────────────────────────────
+  rollback_design:
+    requiredCapability: technical_design
+    compensationStep: true
+    transitions:
+      success: end_rollback
+      failure: end_failure
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # COMPENSACIÓN: Rollback del código (SAGA LIFO)
+  # ─────────────────────────────────────────────────────────────────────────
+  rollback_code:
+    requiredCapability: code_generation
+    compensationStep: true
+    systemPromptOverride: |
+      COMPENSACIÓN SAGA (DEFCON 1):
+
+      Ejecutar en orden LIFO:
+      1. Eliminar archivos creados (último primero)
+      2. Restaurar backups si existen
+      3. Limpiar configuraciones
+      4. Notificar al Commander
+
+      Documentar cada acción de rollback.
+    transitions:
+      success: end_rollback
+      failure: end_failure
+
+# ═══════════════════════════════════════════════════════════════════════════
+# CONFIGURACIÓN DEFCON
+# ═══════════════════════════════════════════════════════════════════════════
+defconLevel: 1
+agentsRequired:
+  - commander
+  - intel
+  - strategist
+  - blueprint
+  - builder
+  - sentinel
+  - operator
+
+agentsOptional:
+  - notary  # FASE 58.4: Auditoría Enterprise opcional
+
+# ═══════════════════════════════════════════════════════════════════════════
+# TIMEOUT Y REINTENTOS
+# ═══════════════════════════════════════════════════════════════════════════
+timeoutPerStep: 120000  # 2 minutos por paso
+maxRetries: 5
+maxSentinelIterations: 5
+minBlueprintFiles: 7  # Minimo de archivos que Blueprint debe generar
+
+# ═══════════════════════════════════════════════════════════════════════════
+# CARACTERÍSTICAS ENTERPRISE
+# ═══════════════════════════════════════════════════════════════════════════
+features:
+  strategistVeto: true
+  exhaustiveReview: true
+  mandatoryTests: true
+  sagaCompensation: true
+  auditLogging: true
+
+# ═══════════════════════════════════════════════════════════════════════════
+# NOTAS DE DISEÑO
+# ═══════════════════════════════════════════════════════════════════════════
+# - Incluye STRATEGIST con poder de VETO
+# - El proyecto puede ser RECHAZADO antes de implementar
+# - Revisión de seguridad obligatoria
+# - Compensación SAGA completa con rollback LIFO
+# - Usar para: sistemas de producción, pagos, autenticación, cloud
+# ═══════════════════════════════════════════════════════════════════════════

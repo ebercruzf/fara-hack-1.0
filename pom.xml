@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>dev.fararoni.hack</groupId>
+    <artifactId>fara-hack-1.0</artifactId>
+    <version>1.0.0</version>
+    <packaging>jar</packaging>
+
+    <name>Fara-Hack 1.0</name>
+    <description>Sovereign Agentic Runtime for SRE Bug Triage — AgentX Hackathon 2026</description>
+    <url>https://github.com/ebercruzf/fara-hack-1.0</url>
+    <inceptionYear>2026</inceptionYear>
+
+    <licenses>
+        <license>
+            <name>MIT License</name>
+            <url>https://opensource.org/licenses/MIT</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <name>Eber Cruz</name>
+            <email>dev@fararoni.dev</email>
+            <organization>fararoni.dev</organization>
+            <roles>
+                <role>Staff Software Architect</role>
+            </roles>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:git://github.com/ebercruzf/fara-hack-1.0.git</connection>
+        <developerConnection>scm:git:ssh://github.com:ebercruzf/fara-hack-1.0.git</developerConnection>
+        <url>https://github.com/ebercruzf/fara-hack-1.0</url>
+    </scm>
+
+    <properties>
+        <maven.compiler.source>25</maven.compiler.source>
+        <maven.compiler.target>25</maven.compiler.target>
+        <maven.compiler.release>25</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <main.class>dev.fararoni.core.hack.HackBootstrap</main.class>
+
+        <!-- Pinned to commit 9f16edb of fararoni-ecosystem (JitPack).
+             Bump here to update fararoni-core + fararoni-enterprise-transport. -->
+        <fararoni.core.version>9f16edb</fararoni.core.version>
+
+        <jackson.version>2.17.0</jackson.version>
+        <nats.version>2.17.2</nats.version>
+        <slf4j.version>2.0.13</slf4j.version>
+        <junit.version>5.10.2</junit.version>
+        <awaitility.version>4.2.1</awaitility.version>
+    </properties>
+
+    <dependencies>
+        <!-- Fararoni Core — Sovereign Agentic Runtime (Apache 2.0) -->
+        <dependency>
+            <groupId>com.github.ebercruzf.fararoni-ecosystem</groupId>
+            <artifactId>fararoni-core</artifactId>
+            <version>${fararoni.core.version}</version>
+        </dependency>
+
+        <!-- Fararoni Enterprise Transport — NATS SovereignEventBus (Apache 2.0, SPI P:100) -->
+        <dependency>
+            <groupId>com.github.ebercruzf.fararoni-ecosystem</groupId>
+            <artifactId>fararoni-enterprise-transport</artifactId>
+            <version>${fararoni.core.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>io.nats</groupId>
+            <artifactId>jnats</artifactId>
+            <version>${nats.version}</version>
+        </dependency>
+
+        <!-- Already shaded inside fararoni-core; provided to avoid duplicates in fat-jar -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>${jackson.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Already shaded inside fararoni-core; provided to avoid duplicates in fat-jar -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <version>${slf4j.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.awaitility</groupId>
+            <artifactId>awaitility</artifactId>
+            <version>${awaitility.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <repositories>
+        <repository>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
+        </repository>
+    </repositories>
+
+    <build>
+        <finalName>fara-hack-1.0</finalName>
+        <plugins>
+            <!-- License header enforcement (MIT) -->
+            <plugin>
+                <groupId>com.mycila</groupId>
+                <artifactId>license-maven-plugin</artifactId>
+                <version>4.3</version>
+                <configuration>
+                    <header>${project.basedir}/LICENSE-HEADER-MIT.txt</header>
+                    <properties>
+                        <year>2026</year>
+                        <owner>Eber Cruz Fararoni</owner>
+                    </properties>
+                    <includes>
+                        <include>**/*.java</include>
+                    </includes>
+                    <excludes>
+                        <exclude>**/target/**</exclude>
+                    </excludes>
+                    <mapping>
+                        <java>SLASHSTAR_STYLE</java>
+                    </mapping>
+                    <strictCheck>true</strictCheck>
+                    <skipExistingHeaders>false</skipExistingHeaders>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <release>25</release>
+                    <compilerArgs>
+                        <arg>--enable-preview</arg>
+                    </compilerArgs>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+                <configuration>
+                    <argLine>--enable-preview</argLine>
+                </configuration>
+            </plugin>
+
+            <!-- Fat-jar (executable) — used by Docker -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.5.3</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>${main.class}</mainClass>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                            </transformers>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

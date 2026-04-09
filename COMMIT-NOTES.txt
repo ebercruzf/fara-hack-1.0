@@ -1,0 +1,409 @@
+═══════════════════════════════════════════════════════════════════════════
+fara-hack-1.0 — Sovereign 4-Agent SRE Triage Pipeline (end-to-end working)
+═══════════════════════════════════════════════════════════════════════════
+Date     : 2026-04-08
+Branch   : bugfix/sovereign-2.0-day2
+Hashtag  : #AgentXHackathon
+
+Summary
+-------
+Replaced the HiveMind 7-agent software-dev swarm (which dispatched
+COMMANDER/BLUEPRINT/BUILDER/...) with a focused 4-agent SRE bug-triage
+pipeline orchestrated from BugReportController via DirectAgentExecutor
+(the same execution path used by `/agent <id>` in the CLI). The new
+pipeline runs end-to-end, sends a real Gmail SMTP notification to the
+on-call engineer, and creates a ticket in the local store — all in
+~3 minutes per submission with qwen3.5:35b-a3b on local Ollama.
+
+Pipeline shape (Java orchestration, Java 25 Virtual Threads)
+------------------------------------------------------------
+
+   STEP 0  : LlmTriageClient (vision adapter, qwen3.5:35b-a3b multimodal)
+                                |
+                                v
+   STEP 2  : triage-coordinator           (sequential gate)
+                                |
+                                v
+   STEP 2.5 ║ STEP 6  : forensic-analyst  ║  mitigation-engineer
+                                |  (parallel via Thread.ofVirtual())
+                                v
+   STEP 3+4 : triage-broker               (sequential, email_send)
+                                |
+                                v
+   STEP 5  : TriageStatusWatcher (existing actor, polls every 30s)
+
+Each agent is loaded by AgentTemplateManager from its YAML in
+workspace/.fararoni/config/agentes/, and invoked by DirectAgentExecutor
+with the same toolset filter the CLI `/agent` command uses.
+
+────────────────────────────────────────────────────────────────────────
+NEW FILES
+────────────────────────────────────────────────────────────────────────
+
+Documentation
+  docs/ARCHITECTURE-AGENTX-2026.md      9-section AgentX submission doc
+  docs/PITCH.md                          3-minute demo script (English)
+  COMMIT-NOTES.txt                       (this file)
+
+Agent YAMLs (loaded at boot by AgentTemplateManager)
+  workspace/.fararoni/config/agentes/triage-coordinator-agent.yaml
+  workspace/.fararoni/config/agentes/forensic-analyst-agent.yaml
+  workspace/.fararoni/config/agentes/mitigation-engineer-agent.yaml
+  workspace/.fararoni/config/agentes/triage-broker-agent.yaml
+
+Each YAML declares a unique capability so it does not collide with
+the existing 7 swarm agents:
+
+  triage-coordinator    -> triage_coordination
+  forensic-analyst      -> forensic_classification
+  mitigation-engineer   -> mitigation_proposal
+  triage-broker         -> external_dispatch
+
+────────────────────────────────────────────────────────────────────────
+MODIFIED FILES
+────────────────────────────────────────────────────────────────────────
+
+src/main/java/dev/fararoni/core/hack/api/BugReportController.java
+  * Added imports: DirectAgentExecutor, AgentTemplateManager, AgentTemplate,
+    java.time.Duration, java.util.concurrent.atomic.AtomicReference
+  * Removed import: dev.fararoni.core.core.swarm.HiveMind (no longer used)
+  * start(): enabled CORS via Javalin bundledPlugins.enableCors().anyHost()
+    so OPTIONS preflights from any origin return 200 instead of 404
+    (defense-in-depth even though Nginx is the perimeter).
+  * registerWebSocket().onConnect: ctx.session.setIdleTimeout(10 min) so
+    the WS Live Feed survives long LLM inferences (qwen3.5:35b-a3b can
+    take 30-120s per turn). Default Jetty 30s closed sockets mid-mission.
+  * processReportAsync(): replaced the single core.executeMission(coreInput)
+    call (which dispatched to HiveMind) with the 4-agent pipeline:
+        triage-coordinator       (sequential gate)
+        forensic-analyst ║ mitigation-engineer (Virtual Thread parallel)
+        triage-broker            (sequential, dispatches email)
+    Aggregated output feeds the existing summary/severity/affectedModules
+    variables so the rest of the controller (ticket creation, WS Live
+    Feed, watcher, fallbacks) keeps working unchanged. Falls back to the
+    existing regex path if any agent throws.
+  * On-call recipient resolved at runtime from ONCALL_EMAIL env var,
+    with fallback to report.reporterEmail() so the demo never fails for
+    missing config. The personal address lives only in .env (gitignored).
+  * Added private helper runDirectAgent(atm, exec, agentId, userMessage)
+    that wraps AgentTemplateManager.getTemplate + DirectAgentExecutor.execute
+    with graceful error envelopes.
+
+web/Dockerfile
+  * Healthcheck: changed wget target from http://localhost/ to
+    http://127.0.0.1/ to fix the IPv6/IPv4 mismatch (Alpine BusyBox
+    resolved localhost to ::1 first but Nginx only binds 0.0.0.0:80).
+    The web container had 471 consecutive failing healthchecks before
+    this fix; after the fix it reports healthy in <5s.
+
+docker-compose.yml
+  * Added MAIL_HOST/PORT/USERNAME/PASSWORD/IMAP_HOST/IMAP_PORT/SENDER/
+    SENDER_NAME passthrough (values come from .env, all default to
+    empty/sane fallbacks).
+  * Added ONCALL_EMAIL passthrough (default empty, controller falls
+    back to reporter email if unset).
+
+.env.example
+  * Documented MAIL_* env vars (Gmail setup recipe with App Password)
+  * Documented ONCALL_EMAIL (optional, falls back to reporter email)
+
+.env (gitignored, NOT committed — values stored locally only)
+  * Real Gmail SMTP credentials for the demo
+  * Real on-call recipient address
+
+docs/ARCHITECTURE-AGENTX-2026.md  (created earlier in the session)
+  * 9-section AgentX submission document covering the Sentinel Pattern,
+    NATS-Native Distributed Tracing (with OpenTelemetry Semantic
+    Conventions and an OTel Collector roadmap for V1.1), and the full
+    use-case walkthrough.
+
+────────────────────────────────────────────────────────────────────────
+END-TO-END TEST RESULTS (2026-04-08 14:40 UTC-6)
+────────────────────────────────────────────────────────────────────────
+
+Submission:
+  POST /api/triage/report
+  reporterEmail : alice.qa@eshop.test
+  title         : NullPointerException in checkout when applying discount code
+  stack frame   : com.eshop.checkout.DiscountService.applyDiscount:142
+  correlationId : e277cf3b-caee-4a55-a147-7522355c3af8
+
+Pipeline trace (from docker compose logs):
+  [DIRECT-AGENT] Tools: 1/38 (allowed=[fs_read, code_search])
+                                                       <- triage-coordinator
+  [DIRECT-AGENT] Tools: 0/38 (allowed=[arcadedb_query, forensic_memory_search])
+                                                       <- forensic-analyst (parallel)
+  [DIRECT-AGENT] Tools: 1/38 (allowed=[fs_read, sentinel_audit, diff_generate])
+                                                       <- mitigation-engineer (parallel)
+  [DIRECT-AGENT] Tools: 1/38 (allowed=[ticket_create, email_send,
+                                       arcadedb_write, mcp_dispatch])
+                                                       <- triage-broker
+  [EMAIL_SEND] Enviando a: [ONCALL_EMAIL]
+              Asunto: [P1] NullPointerException in checkout when applying discount code
+  [EMAIL_SEND] Correo enviado a: [ONCALL_EMAIL]
+
+Result:
+  GET /api/triage/tickets
+  {
+    "count": 1,
+    "tickets": [{
+      "ticketId":  "FH-1",
+      "title":     "NullPointerException in checkout when applying discount code",
+      "state":     "OPEN",
+      "severity":  "P1",
+      "createdAt": "2026-04-08T20:40:19.771490546Z",
+      "ticketUrl": "local://ticket/e277cf3b-caee-4a55-a147-7522355c3af8"
+    }]
+  }
+
+Email delivery: confirmed by recipient at [ONCALL_EMAIL] (1 email,
+no duplicates, sent from [MAIL_SENDER] via Gmail SMTP).
+
+Total wall-clock time per submission: ~3 minutes
+  (4 sequential LLM turns with qwen3.5:35b-a3b on local Ollama,
+   step 2 and step 6 overlap in the parallel branch)
+
+────────────────────────────────────────────────────────────────────────
+HACKATHON COVERAGE (5 mandatory + 2 differentiators)
+────────────────────────────────────────────────────────────────────────
+
+  Step 1  Submit via UI                  BugReportController        DONE
+  Step 2  Triage + summary               triage-coordinator agent   DONE
+  Step 2.5 Forensic auto-classification  forensic-analyst agent     DONE *
+  Step 3  Create ticket                  TicketStore.create()       DONE
+  Step 4  Notify team (email)            triage-broker + Gmail SMTP DONE
+  Step 5  Notify reporter on resolved    TriageStatusWatcher actor  DONE
+  Step 6  Sentinel Mitigation Proposal   mitigation-engineer agent  DONE *
+
+  * Steps 2.5 and 6 are the differentiators. They run because the agent
+    YAMLs are loaded and reasoning, but the supporting tools
+    (forensic_memory_search, sentinel_audit, diff_generate, etc.) are
+    declared in the YAMLs but NOT yet registered in the core
+    ToolRegistry. The agents currently degrade gracefully (return
+    null/N-A verdicts). Wiring those tools is core-side work that does
+    NOT block the AgentX submission.
+
+────────────────────────────────────────────────────────────────────────
+KNOWN GAPS / FOLLOW-UPS (post-hackathon)
+────────────────────────────────────────────────────────────────────────
+
+1. Tools declared in agent YAMLs but not in core ToolRegistry:
+     code_search, arcadedb_query, forensic_memory_search, sentinel_audit,
+     diff_generate, ticket_create, arcadedb_write, mcp_dispatch
+   DirectAgentExecutor filters them silently. The 4-agent pipeline still
+   runs end-to-end because the critical tools (fs_read, email_send)
+   ARE registered. Wiring the missing tools turns the differentiator
+   steps from "graceful degradation" into "full evidence with queryIds".
+
+2. executionMode handling: ReactiveSwarmAgent.start() reads
+   `template.metadata().get("executionMode")`, not the top-level field.
+   Our 4 agents end up subscribed to swarm.task.* topics on boot.
+   Harmless (nothing publishes there in our flow), but for cleanliness
+   we should put `metadata: { executionMode: direct }` in the YAMLs.
+
+3. Boot logs still show the 7 default-team agents (commander, blueprint,
+   builder, operator, intel, strategist, sentinel) being loaded.
+   They are unused by our pipeline but still occupy memory. Could be
+   removed from the auto-provisioned default list to clean the boot
+   trace for the demo video.
+
+4. examples/ directory is still empty. To capture as evidence for
+   AGENTS_USE.md sections 6 (observability) and 7 (security):
+     examples/log-sample.txt          <- docker compose logs fara-hack
+     examples/trace-sample.json       <- WS Live Feed export
+     examples/tickets-snapshot.json   <- /api/triage/tickets
+     examples/email-screenshot.png    <- the Gmail message
+     tests/security/*.json            <- prompt injection fixtures
+
+5. Demo video (3 min, English, #AgentXHackathon hashtag) — not yet
+   recorded. PITCH.md has the script ready.
+
+────────────────────────────────────────────────────────────────────────
+CRITICAL FIXES INCLUDED IN THIS COMMIT
+────────────────────────────────────────────────────────────────────────
+
+* CORS preflight 404 -> 200 (smoke test §1 of PENDIENTES, BLOCKER)
+* WS idle timeout 30s -> 10min (smoke test §2 of PENDIENTES, BLOCKER)
+* Web container healthcheck unhealthy (471 fails) -> healthy (BLOCKER)
+* HiveMind dispatching 7 SW-dev agents to SRE triage requests -> RESOLVED
+  by replacing the call with a 4-agent SRE-specific pipeline.
+
+────────────────────────────────────────────────────────────────────────
+SUGGESTED COMMIT MESSAGE
+────────────────────────────────────────────────────────────────────────
+
+feat(fara-hack): 4-agent SRE triage pipeline via DirectAgentExecutor
+
+Replace the HiveMind 7-agent software-dev swarm dispatch with a focused
+4-agent SRE bug-triage pipeline orchestrated from BugReportController:
+triage-coordinator -> (forensic-analyst ║ mitigation-engineer) ->
+triage-broker. Each agent is loaded from its YAML by AgentTemplateManager
+and invoked via DirectAgentExecutor with its own allowedTools filter,
+the same path used by `/agent <id>` in the CLI.
+
+Side-fixes included:
+- Enable Javalin CORS (defense-in-depth, fixes OPTIONS preflight 404)
+- WS idle timeout 30s -> 10min so the Live Feed survives qwen3.5:35b-a3b
+- Web container healthcheck IPv6/IPv4 mismatch (wget localhost -> 127.0.0.1)
+- Pass-through of MAIL_* and ONCALL_EMAIL env vars in docker-compose
+  (real values live only in .env, gitignored)
+
+End-to-end verified: submission -> 4 LLM turns -> Gmail SMTP delivery
+to the on-call recipient + ticket FH-1 in TicketStore. ~3 min per
+submission with qwen3.5:35b-a3b on local Ollama.
+
+#AgentXHackathon
+
+########## termina primera etapa envio de correo ##########
+
+═══════════════════════════════════════════════════════════════════════════
+SEGUNDA ETAPA — NATS Event Bus + JitPack + Model Split (2026-04-09)
+═══════════════════════════════════════════════════════════════════════════
+
+Resumen
+-------
+Se habilitó NATS como bus de eventos primario (NatsSovereignBus P:100)
+vía SPI auto-detection, se migró fararoni-core de m2 local a JitPack,
+y se validó el pipeline E2E completo con Model Split Strategy.
+
+────────────────────────────────────────────────────────────────────────
+CAMBIOS EN FARARONI-ECOSYSTEM (commit b58ab4a)
+────────────────────────────────────────────────────────────────────────
+
+pom.xml (parent)
+  * Nueva property centralizada: <fararoni.core.version>1.2.0</fararoni.core.version>
+
+fararoni-gateway-rest/pom.xml
+  * version 1.0.0 → ${fararoni.core.version}
+
+fararoni-distribution/pom.xml
+  * ${project.version} → ${fararoni.core.version}
+
+fararoni-enterprise-transport/.../NatsSovereignBus.java
+  * Import: java.util.concurrent.Flow
+  * subscribe() cambia de void → Flow.Subscription
+  * Return: Flow.Subscription con cancel() que desregistra del NATS
+    (jsSubscriptions + dispatchers) — fix de suscripciones zombie
+
+────────────────────────────────────────────────────────────────────────
+CAMBIOS EN FARA-HACK-1.0
+────────────────────────────────────────────────────────────────────────
+
+pom.xml
+  * Migración de m2 local a JitPack (commit b58ab4a)
+  * groupId: com.github.ebercruzf.fararoni-ecosystem
+  * Nueva dependencia: fararoni-enterprise-transport (NATS bus SPI P:100)
+  * jackson-databind y slf4j-simple → scope provided (evita duplicados)
+  * Plugin com.mycila:license-maven-plugin:4.3 (headers MIT)
+  * Datos de autor completos: Eber Cruz, dev@fararoni.dev, fararoni.dev
+  * SCM, inceptionYear, limpieza de comentarios obsoletos
+
+docker-compose.yml
+  * TZ=America/Mexico_City en fara-hack container (hora sincronizada)
+
+QUICKGUIDE.md
+  * JitPack apunta a b58ab4a (antes 335f2b1)
+  * Sección "Rebuild a single service" (docker compose up --build -d)
+  * Sección "Monitor backend logs" (docker compose logs -f fara-hack)
+  * enterprise-transport documentado como dependencia
+
+SCALING.md
+  * Nueva sección "Model Split Strategy: Perceptual vs Logic Optimization"
+  * qwen3.5:35b-a3b (MoE, visión) vs qwen2.5-coder:32b (dense, tool-calling)
+
+docs/ reorganizado
+  * docs/architecture/ — diagramas y ADRs
+  * docs/guides/ — manuales y pitch
+  * docs/internal/ — decisiones internas
+  * docs/img/screenshots/, docs/img/diagrams/, docs/img/evidence/
+  * Todas las referencias entre archivos actualizadas
+
+Licencia y autor
+  * LICENSE-HEADER-MIT.txt creado
+  * 14/14 clases Java con header MIT + @author Eber Cruz @version 1.0.0
+  * Limpieza de referencias a herramientas AI en todos los archivos
+
+────────────────────────────────────────────────────────────────────────
+DEMO E2E CON NATS (2026-04-09 00:47 CST)
+────────────────────────────────────────────────────────────────────────
+
+Bus activado por SPI:
+  [BUS-FACTORY] Detectado: InMemorySovereignBus (P:0)
+  [BUS-FACTORY] Detectado: NatsSovereignBus (P:100)       ← GANÓ
+  [MILITARY-GRADE] Primary: NatsSovereignBus (P:100)
+                   Standby: ChronicleQueueBus (P:50)
+  [NATS-BUS] Connected - URL: nats://nats:4222, JetStream: true
+
+Run 1 — consola-error.png (stack trace terminal):
+  correlationId: 17b863f2-5b40-4696-8079-17ce28924f24
+  Vision: severity=P0, confidence=0.90
+  Pipeline: 167698ms, Ticket FH-1
+  Email: enviado a on-call
+
+Run 2 — error-500.png (browser shopping cart UI):
+  correlationId: eb7fb0fd-a344-4f31-aefa-f1332a59edf9
+  Vision: severity=P0, confidence=0.95 (subió — dos fuentes concordando)
+  Pipeline: 143906ms, Ticket FH-2
+
+Run 3 — consola-error.png (solo imagen, sin texto):
+  correlationId: 29216d27-bb92-46d2-bc0f-b590b0244de8
+  Vision: severity=P1, confidence=0.90 (bajó — sin contexto de texto)
+  Pipeline completo, Ticket FH-3
+  Prueba confirma que visión NO está hardcodeada: sin texto el modelo
+  solo hace OCR de la imagen y la severity baja de P0 a P1.
+
+Model Split verificado en logs de Ollama:
+  qwen3.5:35b-a3b  → architecture=qwen35moe, 41 layers, 21.9 GiB (visión)
+  qwen2.5-coder:32b → architecture=qwen2, 65 layers, 18.1 GiB (agentes)
+  Swap automático por Ollama entre modelos (~10s eviction)
+
+────────────────────────────────────────────────────────────────────────
+LIMPIEZA Y DOCUMENTACIÓN (2026-04-09 madrugada)
+────────────────────────────────────────────────────────────────────────
+
+Agentes limpiados
+  * Respaldados 18 YAMLs en backup-agents-fara-hack/ (fuera del proyecto)
+  * Eliminados 14 agentes no usados del workspace (swarm de dev)
+  * Solo quedan los 4 del pipeline SRE: triage-coordinator,
+    forensic-analyst, mitigation-engineer, triage-broker
+  * Boot: 18 → 14 dynamic agent result topics (10 restantes son
+    hardcodeados en fararoni-core, no eliminables sin tocar core)
+
+docs/ reorganizado
+  * docs/architecture/ — ARCHITECTURE-DIAGRAM.md, DIAGRAMA-SECUENCIA.md,
+    TRIAGE-PIPELINE.md, ADR-001-SOC-REVERSE-PROXY.md
+  * docs/guides/ — MANUAL-USUARIO.md, FLUJO-FARA-HACK.md, PITCH.md
+  * docs/internal/ — decisiones internas
+  * docs/img/screenshots/, diagrams/, evidence/
+  * Todas las referencias entre archivos actualizadas
+
+ARCHITECTURE-DIAGRAM.md actualizado
+  * Agregado mock-eshop (/repo bind mount) al diagrama de contenedores
+  * Sección 5: tabla de los 4 agentes con prompts, tools, y modelo LLM
+  * Documentado frontend (Angular 20.3, WebSocket nativo, Nginx 1.27)
+  * Documentado TicketStore (in-memory, REST endpoints)
+
+Autor y licencia
+  * @author Eber Cruz + @version 1.0.0 + @since 1.0.0 en 14/14 clases
+  * Author en todos los .md de docs/
+  * Fechas removidas de docs (solo autor y versión)
+  * POM limpiado: datos completos de autor, SCM, sin comentarios obsoletos
+
+README.md Tech Stack
+  * Expandido con Angular 20.3, WebSocket, Nginx 1.27, Javalin 6.1,
+    SQLite, ChronicleQueue, Model Split (qwen3.5 + qwen2.5-coder)
+
+────────────────────────────────────────────────────────────────────────
+PENDIENTES PARA MAÑANA
+────────────────────────────────────────────────────────────────────────
+
+1. Limpiar código muerto y TODOs obsoletos de las 14 clases Java
+   (dejar JavaDoc y comentarios de arquitectura, borrar código
+   comentado, workarounds resueltos, y comentarios auto-evidentes)
+
+2. Reescribir AGENTS_USE.md para reflejar los 4 agentes reales:
+   - Nombres correctos (triage-coordinator, forensic-analyst, etc.)
+   - Model Split documentado (qwen3.5 visión vs qwen2.5-coder agentes)
+   - Extractos reales de los system prompts de cada YAML
+   - Eliminar referencias a code-surgeon-agent.yaml (no existe)
+

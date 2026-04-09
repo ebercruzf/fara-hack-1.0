@@ -1,0 +1,9 @@
+target/
+.env
+*.log
+.idea/
+*.iml
+.DS_Store
+dependency-reduced-pom.xml
+.jar-backups/
+target.backup-*/

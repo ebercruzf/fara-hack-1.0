@@ -1,0 +1,20 @@
+{
+  "correlationId": "07c71fec-1a65-43fd-8ea9-38358b0262d9",
+  "captured_at": "2026-04-08T13:02:17-0600",
+  "request": {
+    "reporterEmail": "alice@example.com",
+    "title": "NullPointerException in checkout when applying discount code",
+    "description": "Customer reports that applying a percentage discount code at checkout throws a 500 error. Repro: add any item to cart > apply code SAVE10 > click 'Continue to payment'. Browser shows red toast 'Internal server error'. Started after the deploy of v2.14.3 yesterday. Affecting roughly 30% of checkouts according to our error tracker.",
+    "stackTrace": "java.lang.NullPointerException: Cannot invoke \"DiscountCode.getPercentage()\" because \"code\" is null\n  at com.eshop.checkout.DiscountService.applyDiscount(DiscountService.java:142)\n  at com.eshop.checkout.CheckoutController.continueToPayment(CheckoutController.java:88)\n  at jdk.internal.reflect.GeneratedMethodAccessor71.invoke(Unknown Source)\n  at org.springframework.web.method.support.InvocableHandlerMethod.doInvoke(InvocableHandlerMethod.java:205)\n  at com.eshop.checkout.CheckoutFilter.doFilter(CheckoutFilter.java:57)"
+  },
+  "event_count": 1,
+  "events": [
+    {
+      "type": "CONNECTED",
+      "correlationId": "07c71fec-1a65-43fd-8ea9-38358b0262d9",
+      "actor": "system",
+      "thought": "Live reasoning trace ready for 07c71fec-1a65-43fd-8ea9-38358b0262d9",
+      "timestamp": "2026-04-08T19:01:47.130365866Z"
+    }
+  ]
+}

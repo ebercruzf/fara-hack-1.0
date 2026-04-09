@@ -1,0 +1,148 @@
+<div class="layout">
+
+  <!-- ─── Header ───────────────────────────────────────────── -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">FH</span>
+      <div>
+        <h1>Fara-Hack 1.0</h1>
+        <span class="subtitle">Sovereign Agentic Runtime · Bug Triage Pipeline</span>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span class="tag">#AgentXHackathon</span>
+      <span class="ws-status" [class.connected]="connected()">
+        <span class="dot"></span>
+        {{ connected() ? 'Live feed ON' : 'Disconnected' }}
+      </span>
+    </div>
+  </header>
+
+  <main class="grid">
+
+    <!-- ─── LEFT: intake form + tickets ───────────────────── -->
+    <section class="panel form-panel">
+      <h2>Submit a bug</h2>
+
+      <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+        <label class="field">
+          <span>Reporter email</span>
+          <input
+            type="email"
+            formControlName="reporterEmail"
+            placeholder="you@example.com"
+            autocomplete="email" />
+        </label>
+
+        <label class="field">
+          <span>Title</span>
+          <input
+            type="text"
+            formControlName="title"
+            maxlength="200"
+            placeholder="NullReferenceException in CatalogController on POST /items" />
+        </label>
+
+        <label class="field">
+          <span>Description</span>
+          <textarea
+            formControlName="description"
+            rows="5"
+            maxlength="8000"
+            placeholder="What did you do? What did you expect? What happened?"></textarea>
+        </label>
+
+        <label class="field">
+          <span>Stack trace / log <small>(optional)</small></span>
+          <textarea
+            formControlName="stackTrace"
+            rows="6"
+            maxlength="16000"
+            placeholder="System.NullReferenceException: Object reference not set..."></textarea>
+        </label>
+
+        <label class="field file-field">
+          <span>Attach file <small>(optional — log/screenshot)</small></span>
+          <input type="file" (change)="onFileSelected($event)" />
+          @if (attachedFile(); as f) {
+            <small class="file-info">{{ f.name }} ({{ f.size }} bytes)</small>
+          }
+        </label>
+
+        <button
+          type="submit"
+          class="submit"
+          [disabled]="form.invalid || submitting()">
+          {{ submitting() ? 'Submitting…' : 'Submit bug report' }}
+        </button>
+
+        @if (errorMessage()) {
+          <p class="error">{{ errorMessage() }}</p>
+        }
+
+        @if (currentCorrelationId()) {
+          <p class="correlation">
+            <span>correlationId:</span>
+            <code>{{ currentCorrelationId() }}</code>
+          </p>
+        }
+      </form>
+
+      <h2 class="ticket-header">Created tickets ({{ tickets().length }})</h2>
+      <ul class="ticket-list">
+        @for (t of tickets(); track trackByTicketId($index, t)) {
+          <li class="ticket-item">
+            <div class="ticket-row">
+              <span class="ticket-id">{{ t.ticketId }}</span>
+              <span class="severity" [class]="severityClass(t.severity)">{{ t.severity }}</span>
+              <span class="state state-{{ t.state.toLowerCase() }}">{{ t.state }}</span>
+              @if (t.sentinelVerified) {
+                <span class="sentinel-badge" title="Patch passed Sentinel audit">✓ Sentinel</span>
+              }
+            </div>
+            <div class="ticket-title">{{ t.title }}</div>
+            @if (t.state !== 'RESOLVED') {
+              <button class="resolve-btn" (click)="resolveTicket(t.ticketId)">
+                Mark Resolved
+              </button>
+            }
+          </li>
+        } @empty {
+          <li class="empty">No tickets yet. Submit a bug above.</li>
+        }
+      </ul>
+    </section>
+
+    <!-- ─── RIGHT: reasoning trace terminal ───────────────── -->
+    <section class="panel trace-panel">
+      <h2>Reasoning trace
+        @if (pipelineComplete()) {
+          <span class="badge done">DONE</span>
+        }
+      </h2>
+      <div class="terminal" #terminalScroll>
+        @for (event of traces(); track trackByIndex($index)) {
+          <div class="trace-line">
+            <span class="ts">{{ event.timestamp | slice:11:19 }}</span>
+            @if (event.step) {
+              <span class="step" [class]="stepClass(event.step)">{{ event.step }}</span>
+            }
+            @if (event.actor) {
+              <span class="actor">[{{ event.actor }}]</span>
+            }
+            <span class="thought">{{ event.thought }}</span>
+          </div>
+        } @empty {
+          <div class="empty-trace">
+            Waiting for a bug report to start streaming the agent's
+            reasoning trace…
+          </div>
+        }
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>Java 25 · Virtual Threads · NATS · Javalin · Angular 20 · MIT License</span>
+  </footer>
+</div>
