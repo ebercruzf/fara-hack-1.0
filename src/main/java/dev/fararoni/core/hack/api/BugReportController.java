@@ -12,6 +12,8 @@ import dev.fararoni.core.FararoniCore;
 import dev.fararoni.core.core.commands.DirectAgentExecutor;
 import dev.fararoni.core.core.mission.engine.AgentTemplateManager;
 import dev.fararoni.core.core.mission.model.AgentTemplate;
+import dev.fararoni.bus.agent.api.bus.SovereignEnvelope;
+import dev.fararoni.bus.agent.api.bus.SovereignEventBus;
 import dev.fararoni.core.hack.config.HackConfig;
 import dev.fararoni.core.hack.llm.LlmTriageClient;
 import dev.fararoni.core.hack.llm.LlmTriageResult;
@@ -353,11 +355,17 @@ public final class BugReportController {
             }
 
             // ─── Step 2-6 — 4-agent pipeline via DirectAgentExecutor ──
-            // Each agent is loaded from its YAML in
-            // workspace/.fararoni/config/agentes/ and invoked via
-            // DirectAgentExecutor (qwen2.5-coder:32b).
+            // Orchestrated by the controller with NATS telemetry.
+            // DirectAgentExecutor drives the LLM tool-calling loop for each
+            // agent. The Sovereign Bus (NATS P:100) is used for telemetry
+            // publishing so the pipeline is observable via bus subscribers.
             //
             // Pipeline: coordinator → (forensic ║ mitigation) → broker
+            //
+            // NOTE: Full bus-orchestrated missions (agency.mission.start →
+            // SovereignMissionEngineV2) require a core fix for NATS
+            // payload deserialization (LinkedHashMap vs typed record).
+            // Tracked for V2. See docs/ANALYSIS-NATS-SOVEREIGN-TOOLING.md §3.
             publishTrace(cid, "STEP_2_REASONING", "triage-coordinator",
                     core != null
                             ? "Spawning 4-agent pipeline (Coordinator → Forensic ║ Mitigation → Broker)"
@@ -366,30 +374,27 @@ public final class BugReportController {
             String severity;
             String summary;
             List<String> affectedModules;
-            // Sentinel audit results — populated INSIDE the agentic block
-            // when the mitigation-engineer returns a parseable patch. Stay
-            // empty/false otherwise so the downstream ticket creation works
-            // exactly as before in the fallback path.
             boolean sentinelVerified = false;
             String mitigationBlock = "";
+
+            // Resolve NATS bus for telemetry (nullable — pipeline works without it)
+            final SovereignEventBus bus = core != null ? core.getSovereignBus() : null;
 
             if (core != null) {
                 final String coreInput = buildCorePrompt(report, visionEvidence);
                 try {
                     final long t0 = System.currentTimeMillis();
                     final AgentTemplateManager atm = core.getAgentTemplateManager();
-                    // [2026-04-09] Public fararoni-core 1.0.0 (Apache 2.0)
-                    // exposes the dispatcher as getLlmDispatcher() instead
-                    // of getDispatcher() (the v2 monorepo internal name).
-                    // We use the public API name now that we depend on
-                    // the published jar from fararoni-ecosystem.
                     final DirectAgentExecutor exec = new DirectAgentExecutor(core.getLlmDispatcher());
 
-                    // ── STEP 2: Triage Coordinator (sequential, gates the parallel branch) ──
+                    // ── STEP 2: Triage Coordinator (sequential gate) ──
+                    publishBusTelemetry(bus, cid, "triage-coordinator", "THINKING", "Processing bug report");
                     final String triageJson = runDirectAgent(
                             atm, exec, "triage-coordinator", coreInput);
                     publishTrace(cid, "STEP_2_REASONING", "triage-coordinator",
                             "Coordinator output (" + triageJson.length() + " chars)");
+                    publishBusTelemetry(bus, cid, "triage-coordinator", "COMPLETED",
+                            "Severity classified (" + triageJson.length() + " chars)");
 
                     // ── STEP 2.5 + 6: Forensic ║ Mitigation in parallel (Virtual Threads) ──
                     final String contextWithCoord = coreInput
@@ -399,6 +404,8 @@ public final class BugReportController {
 
                     publishTrace(cid, "STEP_2_5_FORENSIC", "forensic-analyst",
                             "Spawning parallel branch (forensic ║ mitigation) on Virtual Threads");
+                    publishBusTelemetry(bus, cid, "forensic-analyst", "THINKING", "Analyzing duplicates + ownership");
+                    publishBusTelemetry(bus, cid, "mitigation-engineer", "THINKING", "Generating patch proposal");
 
                     final Thread tForensic = Thread.ofVirtual()
                             .name("forensic-" + cid)
@@ -429,82 +436,49 @@ public final class BugReportController {
                             "Forensic done (" + forensicJson.length() + " chars)");
                     publishTrace(cid, "STEP_6_MITIGATION", "mitigation-engineer",
                             "Mitigation done (" + mitigationJson.length() + " chars)");
+                    publishBusTelemetry(bus, cid, "forensic-analyst", "COMPLETED",
+                            "Forensic analysis done (" + forensicJson.length() + " chars)");
+                    publishBusTelemetry(bus, cid, "mitigation-engineer", "COMPLETED",
+                            "Patch proposal done (" + mitigationJson.length() + " chars)");
 
                     // ── STEP 6 audit — Sentinel verdict on the patch ──
-                    // Extracts ```diff from mitigation output, audits via
-                    // SentinelDiffAdapter (6-dimension). Outcomes:
-                    //   * no patch → summary-only ticket
-                    //   * APPROVED → patch attached, sentinelVerified=true
-                    //   * REJECTED → patch discarded, kill-switch fires
                     if (config.mitigationEnabled()
                             && mitigationJson != null
                             && !mitigationJson.isBlank()) {
-                        // Agent returns ```diff fence or NO_PATCH.
-                        // extractUnifiedDiff() is tolerant to prose around the fence.
                         final String candidatePatch = extractUnifiedDiff(mitigationJson);
-                        LOG.info(() -> "[SENTINEL] Extracted diff len="
-                                + candidatePatch.length()
-                                + " preview=" + truncateForTrace(candidatePatch));
                         if (candidatePatch.isBlank()) {
-                            LOG.info("[SENTINEL] SKIPPED — NO_PATCH or no diff fence in mitigation output");
                             publishTrace(cid, "STEP_6_MITIGATION", "sentinel-auditor",
-                                    "No patch in mitigation output (NO_PATCH or no fence) — graceful skip");
+                                    "No patch / graceful skip");
                         } else {
-                            LOG.info(() -> "[SENTINEL] Auditing diff (" + candidatePatch.length()
-                                    + " chars) on 6 dimensions");
                             publishTrace(cid, "STEP_6_MITIGATION", "sentinel-auditor",
-                                    "Auditing extracted diff (" + candidatePatch.length()
-                                            + " chars) on 6 dimensions");
+                                    "Auditing diff (" + candidatePatch.length() + " chars) on 6 dimensions");
                             final var verdict = SentinelDiffAdapter.audit(candidatePatch);
                             switch (verdict) {
                                 case SentinelDiffAdapter.Verdict.Approved a -> {
                                     sentinelVerified = true;
                                     mitigationBlock = "\n\n## Sentinel-Verified Patch\n```diff\n"
                                             + candidatePatch + "\n```\n";
-                                    LOG.info(() -> "[SENTINEL] APPROVED — "
-                                            + a.linesChanged() + " lines, "
-                                            + a.filesTouched() + " files");
                                     publishTrace(cid, "STEP_6_MITIGATION", "sentinel-auditor",
                                             "APPROVED — " + a.linesChanged() + " lines, "
                                                     + a.filesTouched() + " files");
                                 }
                                 case SentinelDiffAdapter.Verdict.Rejected r -> {
-                                    LOG.warning(() -> "[SENTINEL] REJECTED — rule=" + r.rule()
-                                            + " reason=" + r.reason()
-                                            + " evidence=" + r.evidenceLine());
                                     publishTrace(cid, "STEP_6_MITIGATION", "sentinel-auditor",
                                             "REJECTED — rule=" + r.rule()
-                                                    + " reason=" + r.reason()
-                                                    + " evidence=" + truncateForTrace(r.evidenceLine()));
+                                                    + " reason=" + r.reason());
                                 }
                             }
                         }
-                    } else {
-                        LOG.info(() -> "[SENTINEL] Audit skipped — "
-                                + (config.mitigationEnabled() ? "no mitigation output" : "feature disabled"));
                     }
 
-                    // ── STEP 3+4: Triage Broker composes email + dispatches notifications ──
-                    // On-call email comes from the ONCALL_EMAIL env var
-                    // (loaded by docker-compose from .env, which is gitignored).
-                    // If unset, falls back to the reporter email so the demo
-                    // still produces a working notification loop without
-                    // requiring any operator-specific configuration in git.
+                    // ── STEP 3+4: Triage Broker ──
                     final String oncallEnv = System.getenv("ONCALL_EMAIL");
                     final String oncallEmail = (oncallEnv != null && !oncallEnv.isBlank())
                             ? oncallEnv
                             : report.reporterEmail();
-
-                    // Replace raw diff with a high-level summary for the broker.
-                    // Raw paths in the diff can trigger the core's tool-name
-                    // heuristic, hijacking the broker into fs_write instead of
-                    // email_send. The actual diff goes to the ticket body separately.
                     final String mitigationSummary = sentinelVerified
-                            ? "Sentinel-verified patch attached to ticket. "
-                                    + "Recommendation: add a null guard before "
-                                    + "accessing the discount code property."
-                            : "No patch proposed (or rejected by Sentinel). "
-                                    + "Manual investigation required.";
+                            ? "Sentinel-verified patch attached to ticket."
+                            : "No patch proposed (or rejected by Sentinel). Manual investigation required.";
 
                     final String brokerInput = coreInput
                             + "\n\n=== Triage Coordinator output ===\n" + triageJson
@@ -513,20 +487,18 @@ public final class BugReportController {
                             + "\n\nONCALL_EMAIL: " + oncallEmail
                             + "\nREPORTER_EMAIL: " + report.reporterEmail()
                             + "\nCORRELATION_ID: " + cid;
+                    publishBusTelemetry(bus, cid, "triage-broker", "THINKING", "Composing notification");
                     final String brokerJson = runDirectAgent(
                             atm, exec, "triage-broker", brokerInput);
                     publishTrace(cid, "STEP_4_NOTIFY", "triage-broker",
+                            "Broker dispatched (" + brokerJson.length() + " chars)");
+                    publishBusTelemetry(bus, cid, "triage-broker", "COMPLETED",
                             "Broker dispatched (" + brokerJson.length() + " chars)");
 
                     final long elapsed = System.currentTimeMillis() - t0;
                     publishTrace(cid, "STEP_2_REASONING", "fara-hack",
                             "4-agent pipeline complete in " + elapsed + "ms");
 
-                    // Aggregate canonical fields. The summary is a
-                    // structured concat of the 4 agent outputs (the WS
-                    // Live Feed and the ticket body both use it). Severity
-                    // and affected modules prefer the LLM vision adapter
-                    // result if available, else fall back to regex.
                     summary = truncateForTicket(
                             "[Triage Coordinator]\n" + triageJson
                                     + "\n\n[Forensic Analyst]\n" + forensicJson
@@ -550,7 +522,6 @@ public final class BugReportController {
                     affectedModules = extractAffectedFiles(report);
                 }
             } else {
-                // Core wasn't bootstrapped (no LLM available at startup)
                 severity = guessSeverity(report);
                 summary = (llmResult != null && llmResult.isReal())
                         ? llmResult.technicalSummary()
@@ -560,19 +531,6 @@ public final class BugReportController {
 
             publishTrace(cid, "STEP_2_REASONING", "fararoni-core",
                     "Severity=" + severity + ", affectedModules=" + affectedModules);
-
-            // Step 2.5 — Forensic auto-classification (stub for v1.0.0)
-            publishTrace(cid, "STEP_2_5_FORENSIC", "data-guardian",
-                    "Querying ForensicMemory for similar reports (forensic stub)");
-            final String suggestedOwner = null;
-            final boolean isDuplicate = false;
-            publishTrace(cid, "STEP_2_5_FORENSIC", "data-guardian",
-                    "duplicateOf=null, suggestedOwner=null, severityHint=" + severity);
-
-            // (Step 6 Sentinel audit moved INSIDE the agentic block above
-            //  so it runs as part of the 4-agent pipeline, on the actual
-            //  patch produced by the mitigation-engineer agent. The dead
-            //  candidatePatch="" stub that used to live here is gone.)
 
             // Step 3 — Create ticket
             publishTrace(cid, "STEP_3_TICKET", "integration-broker",
@@ -590,7 +548,7 @@ public final class BugReportController {
                     report.title(),
                     body,
                     severity,
-                    suggestedOwner,
+                    null,
                     affectedModules,
                     "local://ticket/" + cid,
                     sentinelVerified
@@ -605,14 +563,6 @@ public final class BugReportController {
             publishTrace(cid, "STEP_4_NOTIFY", "integration-broker",
                     "Team notification dispatched");
 
-            // Step 4 (mock communicator) — Slack/Discord channel notification.
-            // The hackathon assignment requires "email and/or communicator"
-            // — we satisfy email with the real Gmail SMTP path above, and
-            // we satisfy the communicator dimension with this mocked log
-            // trace. Per the official rules: "Mocked components are
-            // acceptable if the end-to-end flow is clearly demoable."
-            // The trace is structured so docker compose logs + WS Live
-            // Feed both show it as evidence for AGENTS_USE.md §6.
             final String channel = "#sre-incidentes";
             LOG.info(() -> "[COMMUNICATOR] Alerta enviada al canal "
                     + channel + " — ticket=" + ticket.ticketId()
@@ -826,6 +776,34 @@ public final class BugReportController {
     /** Compiled once. Matches a markdown ```diff or ```patch code fence. */
     private static final Pattern DIFF_FENCE_PATTERN = Pattern.compile(
             "(?s)```(?:diff|patch)?\\s*\\n(.*?)```");
+
+    /**
+     * Publishes a telemetry event to the NATS Sovereign Bus.
+     * Best-effort: if bus is null or publish fails, the pipeline continues.
+     * This makes the pipeline observable via NATS subscribers without
+     * coupling the orchestration to the bus.
+     */
+    private void publishBusTelemetry(SovereignEventBus bus, String correlationId,
+                                      String agentRole, String action, String message) {
+        if (bus == null) return;
+        try {
+            final ObjectNode payload = MAPPER.createObjectNode();
+            payload.put("agentId", agentRole);
+            payload.put("role", agentRole);
+            payload.put("action", action);
+            payload.put("message", message);
+            payload.put("state", action);
+            payload.put("timestamp", Instant.now().toString());
+
+            final var envelope = SovereignEnvelope.createSecure(
+                agentRole, agentRole, null, "swarm.telemetry", (Object) payload
+            ).withCorrelation(correlationId);
+
+            bus.publish("swarm.telemetry", envelope);
+        } catch (Exception e) {
+            LOG.fine(() -> "[NATS-TELEMETRY] publish failed (non-fatal): " + e.getMessage());
+        }
+    }
 
     private static String truncateForTicket(String s) {
         if (s == null) return "";
